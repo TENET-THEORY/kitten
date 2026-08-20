@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
   implementation(libs.clikt)
+  implementation(projects.ai)
   implementation(projects.deps)
   implementation(projects.projectGenerator)
 }
