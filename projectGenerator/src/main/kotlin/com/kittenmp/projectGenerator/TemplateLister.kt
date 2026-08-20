@@ -1,6 +1,6 @@
 package com.kittenmp.projectGenerator
 
-import com.kittenmp.projectGenerator.ai.ComprehensionDebt
+import com.kittenmp.ai.ComprehensionDebt
 import java.net.JarURLConnection
 import java.net.URL
 import java.nio.file.Path

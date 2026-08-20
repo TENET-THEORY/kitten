@@ -1,4 +1,4 @@
-package com.kittenmp.projectGenerator.ai
+package com.kittenmp.ai
 
 @RequiresOptIn(
     level = RequiresOptIn.Level.WARNING,
@@ -7,4 +7,7 @@ package com.kittenmp.projectGenerator.ai
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
-annotation class ComprehensionDebt
+annotation class ComprehensionDebt(
+    val agent: String = "",
+    val model: String = "",
+)

@@ -1,0 +1,33 @@
+---
+description: Annotate AI-generated Kotlin code with @ComprehensionDebt
+alwaysApply: true
+---
+
+# Comprehension Debt
+
+All AI-generated Kotlin code must be annotated with `@ComprehensionDebt` until a human has thoroughly reviewed or rewritten it.
+
+- Import: `com.kittenmp.ai.ComprehensionDebt`
+- Annotate the generated **class** and **every generated method/function** on that class (the annotation targets only `CLASS` and `FUNCTION`)
+- Also annotate nested types that were AI-written
+- Prefer the smallest unit that was AI-written (function over class when only some methods are AI-generated; when the whole type is AI-generated, annotate the class **and** all of its methods)
+- Fill optional `agent` and `model` from the generating session identity when known
+- Do not remove `@ComprehensionDebt` unless the human author has reviewed/rewritten that code
+- Modules that use the annotation must depend on `:ai`
+
+```kotlin
+import com.kittenmp.ai.ComprehensionDebt
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+class Example {
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun doWork() {
+    // AI-generated implementation
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun helper() {
+    // AI-generated implementation
+  }
+}
+```

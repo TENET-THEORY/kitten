@@ -1,6 +1,6 @@
 package com.kittenmp.projectGenerator
 
-import com.kittenmp.projectGenerator.ai.ComprehensionDebt
+import com.kittenmp.ai.ComprehensionDebt
 import java.io.File
 import kotlin.jvm.javaClass
 

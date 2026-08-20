@@ -15,4 +15,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "kitten"
 include("app")
+include("ai")
+include("deps")
 include("projectGenerator")
