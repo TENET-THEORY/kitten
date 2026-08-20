@@ -1,4 +1,4 @@
-package com.kittenmp.projectgenerator
+package com.kittenmp.projectGenerator
 
 import java.io.File
 
@@ -30,6 +30,11 @@ class ProjectGenerator(
     templateLister.listEntries().forEach { relativePath ->
       templateEntryCopier.copy(relativePath)
     }
+    makeGradlewExecutable()
+  }
+
+  private fun makeGradlewExecutable() {
+    File(targetDir, "gradlew").setExecutable(true)
   }
 }
 

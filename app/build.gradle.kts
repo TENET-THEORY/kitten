@@ -3,12 +3,9 @@ plugins {
     application
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
   implementation(libs.clikt)
+  implementation(projects.projectGenerator)
 }
 
 java {
@@ -18,5 +15,6 @@ java {
 }
 
 application {
+    applicationName = "kitten"
     mainClass = "com.kittenmp.AppKt"
 }

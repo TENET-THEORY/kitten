@@ -1,12 +1,12 @@
-package com.kittenmp.projectgenerator
+package com.kittenmp.projectGenerator
 
-import org.example.ai.ComprehensionDebt
+import com.kittenmp.projectGenerator.ai.ComprehensionDebt
 import java.io.File
 import kotlin.jvm.javaClass
 
 private val BINARY_EXTENSIONS = setOf("jar", "js")
 
-class TemplateEntryCopier(
+internal class TemplateEntryCopier(
   private val targetDir: File,
   private val packagePath: String,
   private val projectName: String,

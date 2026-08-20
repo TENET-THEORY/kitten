@@ -1,6 +1,6 @@
-package com.kittenmp.projectgenerator
+package com.kittenmp.projectGenerator
 
-import org.example.ai.ComprehensionDebt
+import com.kittenmp.projectGenerator.ai.ComprehensionDebt
 import java.net.JarURLConnection
 import java.net.URL
 import java.nio.file.Path
@@ -12,10 +12,10 @@ import kotlin.jvm.javaClass
 private const val PROTOCOL_FILE = "file"
 private const val PROTOCOL_JAR = "jar"
 
-class TemplateLister {
+internal class TemplateLister {
 
   fun listEntries(): List<String> {
-    val url = requireNotNull(javaClass.getResource(TEMPLATE_ROOT)) {
+    val url = requireNotNull(javaClass.getResource("/$TEMPLATE_ROOT")) {
       "missing $TEMPLATE_ROOT resource"
     }
     return when (url.protocol) {

@@ -1,4 +1,4 @@
-package org.example.ai
+package com.kittenmp.projectGenerator.ai
 
 @RequiresOptIn(
     level = RequiresOptIn.Level.WARNING,
