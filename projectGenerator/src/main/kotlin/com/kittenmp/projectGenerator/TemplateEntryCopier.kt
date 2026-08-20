@@ -15,10 +15,11 @@ private val VERBATIM_EXTENSIONS = setOf("jar", "js")
 private val DOTFILE_NAMES = setOf("gitignore", "gitattributes")
 
 internal class TemplateEntryCopier(
+  private val templateRoot: String,
   private val targetDir: File,
   private val packagePath: String,
   private val projectName: String,
-  private val basePackage: String
+  private val basePackage: String,
 ) {
 
   /** Copies one template entry into [targetDir], substituting tokens in text files. */
@@ -27,7 +28,7 @@ internal class TemplateEntryCopier(
     val outputFile = File(targetDir, outputPathFor(relativePath))
     outputFile.parentFile?.mkdirs()
 
-    val resourcePath = "$TEMPLATE_ROOT/$relativePath"
+    val resourcePath = "$templateRoot/$relativePath"
     val inputStream = requireNotNull(javaClass.getResourceAsStream("/$resourcePath")) {
       "missing template resource: $resourcePath"
     }

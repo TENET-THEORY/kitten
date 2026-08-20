@@ -1,0 +1,6 @@
+ktor:
+  application:
+    modules:
+      - __PACKAGE__.RoutingKt.routing
+  deployment:
+    port: 8080

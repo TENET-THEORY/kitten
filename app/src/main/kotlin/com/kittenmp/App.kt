@@ -7,11 +7,13 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.option
 import com.kittenmp.ai.ComprehensionDebt
 import com.kittenmp.ai.HumansOnly
 import com.kittenmp.deps.DependencyInstaller
 import com.kittenmp.projectGenerator.ProjectGenerator
+import com.kittenmp.projectGenerator.ProjectType
 import java.io.File
 
 @HumansOnly
@@ -74,14 +76,17 @@ class New : CliktCommand() {
   val name by argument().optional()
   val basePackage by option("--package")
   val path by option()
+  val type by option("--type", help = "Project type: plain or ktor")
+    .convert { ProjectType.fromCli(it) }
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
-    val answers = resolveNewProjectAnswers(name, basePackage, path)
+    val answers = resolveNewProjectAnswers(name, basePackage, path, type)
     ProjectGenerator(
       projectName = answers.name,
       basePackage = answers.basePackage,
-      parentDir = File(answers.path)
+      parentDir = File(answers.path),
+      projectType = answers.projectType,
     ).generateNewProject()
   }
 }

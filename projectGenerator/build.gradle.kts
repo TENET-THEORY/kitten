@@ -4,4 +4,9 @@ plugins {
 
 dependencies {
   implementation(projects.ai)
+  testImplementation(libs.kotlin.test)
+}
+
+tasks.test {
+  useJUnitPlatform()
 }

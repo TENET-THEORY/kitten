@@ -1,28 +1,31 @@
 package com.kittenmp.projectGenerator
 
+import com.kittenmp.ai.ComprehensionDebt
 import java.io.File
 
-const val TEMPLATE_ROOT = "project-template"
-
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 class ProjectGenerator(
   private val parentDir: File,
   private val projectName: String,
-  private val basePackage: String
+  private val basePackage: String,
+  private val projectType: ProjectType = ProjectType.PLAIN,
 ) {
 
   private val packagePath = basePackage.replace('.', '/')
   private val targetDir = File(parentDir, projectName)
+  private val templateRoot = projectType.templateRoot
 
-  private val templateLister = TemplateLister()
+  private val templateLister = TemplateLister(templateRoot)
   private val templateEntryCopier = TemplateEntryCopier(
+    templateRoot = templateRoot,
     targetDir = targetDir,
     packagePath = packagePath,
     projectName = projectName,
-    basePackage = basePackage
+    basePackage = basePackage,
   )
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   fun generateNewProject() {
-    val targetDir = File(parentDir, projectName)
     if (targetDir.exists()) {
       error("Directory already exists: ${targetDir.absolutePath}")
     }
@@ -33,8 +36,8 @@ class ProjectGenerator(
     makeGradlewExecutable()
   }
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   private fun makeGradlewExecutable() {
     File(targetDir, "gradlew").setExecutable(true)
   }
 }
-

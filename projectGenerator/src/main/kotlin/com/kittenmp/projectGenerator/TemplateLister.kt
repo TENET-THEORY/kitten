@@ -12,11 +12,14 @@ private const val PROTOCOL_JAR = "jar"
  * Lists the template entries, which live either on disk (running from a build directory) or inside
  * the packaged jar.
  */
-internal class TemplateLister {
+internal class TemplateLister(
+  private val templateRoot: String,
+) {
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   fun listEntries(): List<String> {
-    val url = requireNotNull(javaClass.getResource("/$TEMPLATE_ROOT")) {
-      "missing $TEMPLATE_ROOT resource"
+    val url = requireNotNull(javaClass.getResource("/$templateRoot")) {
+      "missing $templateRoot resource"
     }
     return when (url.protocol) {
       PROTOCOL_FILE -> listTemplateEntriesFromFile(url)
@@ -42,7 +45,7 @@ internal class TemplateLister {
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun listTemplateEntriesFromJar(url: URL): List<String> {
     val connection = (url.openConnection() as JarURLConnection).apply { useCaches = false }
-    val prefix = "$TEMPLATE_ROOT/"
+    val prefix = "$templateRoot/"
     return connection.jarFile.use { jar ->
       jar.entries().asSequence()
         .filter { !it.isDirectory && it.name.startsWith(prefix) }
