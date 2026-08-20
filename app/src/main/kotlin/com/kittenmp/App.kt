@@ -37,6 +37,21 @@ class Install : CliktCommand() {
   }
 }
 
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+class Uninstall : CliktCommand() {
+
+  val artifactId by argument()
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  override fun run() {
+    try {
+      echo(DependencyInstaller().use { it.uninstall(artifactId) })
+    } catch (e: Exception) {
+      throw CliktError(e.message ?: "Failed to uninstall dependency")
+    }
+  }
+}
+
 @HumansOnly
 class New : CliktCommand() {
   val name by argument()
@@ -53,5 +68,5 @@ class New : CliktCommand() {
 }
 
 fun main(args: Array<String>) = Kitten()
-  .subcommands(New(), Install())
+  .subcommands(New(), Install(), Uninstall())
   .main(args)

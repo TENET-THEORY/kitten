@@ -81,6 +81,46 @@ class DependencyInstallerTest {
     assertTrue("libs.versions.toml" in failure.message.orEmpty())
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `uninstall removes the catalog entries`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+    installerFor(root).use { it.install("clikt") }
+
+    val summary = installerFor(root).use { it.uninstall("clikt") }
+
+    assertEquals("removed clikt", summary)
+    assertEquals("[versions]\n\n[libraries]\n", File(root, "gradle/libs.versions.toml").readText())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `uninstall accepts a group coordinate`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        clikt = "5.1.0"
+
+        [libraries]
+        clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root).use { it.uninstall("com.github.ajalt.clikt:clikt") }
+
+    assertEquals("removed clikt", summary)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `uninstall of a missing library is an error`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+    val failure = assertFailsWith<IllegalStateException> {
+      installerFor(root).use { it.uninstall("clikt") }
+    }
+    assertTrue("clikt" in failure.message.orEmpty())
+  }
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun tempProject(catalog: String): File {
     val root = Files.createTempDirectory("kitten-project").toFile().also { it.deleteOnExit() }

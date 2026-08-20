@@ -159,6 +159,78 @@ class VersionCatalogEditorTest {
     assertEquals(0, Regex("(?<!\r)\n").findAll(content).count())
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `removes matching version and library entries`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+      clikt = "5.1.0"
+
+      [libraries]
+      kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+      clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+    """.trimIndent() + "\n"
+
+    val result = editor.remove(catalog, "clikt")
+
+    assertEquals(VersionCatalogEditor.Change.REMOVED, result.change)
+    assertEquals(
+      """
+      [versions]
+      kotlin = "2.4.10"
+
+      [libraries]
+      kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `removing a missing alias changes nothing`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+
+      [libraries]
+      kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+
+    val result = editor.remove(catalog, "clikt")
+
+    assertEquals(VersionCatalogEditor.Change.UNCHANGED, result.change)
+    assertEquals(catalog, result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `remove leaves plugins and comments alone`() {
+    val catalog = """
+      # keep me
+
+      [versions]
+      # clikt = "0.0.1"
+      clikt = "5.1.0"
+
+      [libraries]
+      clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+
+    val result = editor.remove(catalog, "clikt")
+
+    assertEquals(VersionCatalogEditor.Change.REMOVED, result.change)
+    assertEquals(true, "# keep me" in result.content)
+    assertEquals(true, """# clikt = "0.0.1"""" in result.content)
+    assertEquals(true, "[plugins]" in result.content)
+    assertEquals(true, """kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }""" in result.content)
+    assertEquals(false, Regex("""^clikt\s*=""", RegexOption.MULTILINE).containsMatchIn(result.content))
+  }
+
   private companion object {
     const val EMPTY_CATALOG = "[versions]\n\n[libraries]\n"
   }

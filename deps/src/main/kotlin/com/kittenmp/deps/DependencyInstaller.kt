@@ -37,6 +37,24 @@ class DependencyInstaller internal constructor(
     return summarize(result.change, alias, match)
   }
 
+  /**
+   * Removes [term] (`artifactId` or `group:artifactId`) from the nearest version catalog and
+   * returns a one-line summary.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun uninstall(term: String): String {
+    val catalogFile = findCatalog(startDir)
+      ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
+    val alias = sanitizeAlias(ArtifactQuery.parse(term).name)
+    val original = catalogFile.readText()
+    val result = versionCatalogEditor.remove(original, alias)
+    if (result.change == VersionCatalogEditor.Change.UNCHANGED) {
+      error("No library '$alias' in ${catalogFile.path}")
+    }
+    catalogFile.writeText(result.content)
+    return "removed $alias"
+  }
+
   override fun close() = mavenCentralClient.close()
 
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")

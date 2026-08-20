@@ -12,7 +12,7 @@ import com.kittenmp.ai.ComprehensionDebt
 internal class VersionCatalogEditor {
 
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
-  enum class Change { ADDED, UPDATED, UNCHANGED }
+  enum class Change { ADDED, UPDATED, UNCHANGED, REMOVED }
 
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   data class UpsertResult(val content: String, val change: Change) {
@@ -47,6 +47,28 @@ internal class VersionCatalogEditor {
   }
 
   /**
+   * Drops `[versions].alias` and `[libraries].alias` when present. Other sections and unrelated
+   * lines are left untouched.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun remove(catalog: String, alias: String): UpsertResult {
+    val newline = if (catalog.contains("\r\n")) "\r\n" else "\n"
+    val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
+    val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
+
+    val versions = removeEntry(lines, VERSIONS_SECTION, alias)
+    val libraries = removeEntry(versions.lines, LIBRARIES_SECTION, alias)
+
+    val content = libraries.lines.joinToString(newline) + if (endsWithNewline) newline else ""
+    val change = if (versions.change == Change.REMOVED || libraries.change == Change.REMOVED) {
+      Change.REMOVED
+    } else {
+      Change.UNCHANGED
+    }
+    return UpsertResult(content, change)
+  }
+
+  /**
    * Replaces the existing `alias = ...` line in [section] if there is one, otherwise appends the
    * entry after the section's last non-blank line.
    */
@@ -70,6 +92,21 @@ internal class VersionCatalogEditor {
     val insertAt = (range.first until range.last).lastOrNull { lines[it].isNotBlank() }?.plus(1)
       ?: range.first
     return EntryUpsert(lines.toMutableList().also { it.add(insertAt, entry) }, Change.ADDED)
+  }
+
+  /** Deletes every `alias = ...` line under [section], including duplicates across repeated headers. */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun removeEntry(lines: List<String>, section: String, alias: String): EntryUpsert {
+    val ranges = sectionRanges(lines).filter { it.name == section }
+    val indices = ranges.flatMap { range ->
+      (range.first until range.last).filter { keyOf(lines[it]) == alias }
+    }
+    if (indices.isEmpty()) return EntryUpsert(lines, Change.UNCHANGED)
+    val mutable = lines.toMutableList()
+    for (index in indices.sortedDescending()) {
+      mutable.removeAt(index)
+    }
+    return EntryUpsert(mutable, Change.REMOVED)
   }
 
   /** Half-open range of entry lines belonging to `[name]`, excluding the header itself. */
