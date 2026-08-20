@@ -6,7 +6,7 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.option
 import com.kittenmp.ai.ComprehensionDebt
 import com.kittenmp.ai.HumansOnly
@@ -69,17 +69,19 @@ class Uninstall : CliktCommand() {
   }
 }
 
-@HumansOnly
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 class New : CliktCommand() {
-  val name by argument()
-  val basePackage by option("--package").default("org.example")
-  val path by option().default(".")
+  val name by argument().optional()
+  val basePackage by option("--package")
+  val path by option()
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
+    val answers = resolveNewProjectAnswers(name, basePackage, path)
     ProjectGenerator(
-      projectName = name,
-      basePackage = basePackage,
-      parentDir = File(path)
+      projectName = answers.name,
+      basePackage = answers.basePackage,
+      parentDir = File(answers.path)
     ).generateNewProject()
   }
 }

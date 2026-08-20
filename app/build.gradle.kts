@@ -1,10 +1,12 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.compose)
     application
 }
 
 dependencies {
   implementation(libs.clikt)
+  implementation(libs.mosaic.runtime)
   implementation(projects.ai)
   implementation(projects.deps)
   implementation(projects.projectGenerator)
