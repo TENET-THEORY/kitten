@@ -13,12 +13,6 @@ class Kitten : CliktCommand() {
   override fun run() = Unit
 }
 
-class Example(): CliktCommand() {
-  override fun run() {
-    println("Hello world")
-  }
-}
-
 class New : CliktCommand() {
   val name by argument()
   val basePackage by option("--package").default("org.example")
@@ -34,5 +28,5 @@ class New : CliktCommand() {
 }
 
 fun main(args: Array<String>) = Kitten()
-  .subcommands(Example(), New())
+  .subcommands(New())
   .main(args)
