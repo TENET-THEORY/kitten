@@ -46,6 +46,15 @@ internal class VersionCatalogEditor {
     return UpsertResult(content, merge(versions.change, libraries.change))
   }
 
+  /** True when `[libraries]` already defines [alias]. */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun containsLibrary(catalog: String, alias: String): Boolean {
+    val lines = catalog.lines()
+    return sectionRanges(lines)
+      .filter { it.name == LIBRARIES_SECTION }
+      .any { range -> (range.first until range.last).any { keyOf(lines[it]) == alias } }
+  }
+
   /**
    * Drops `[versions].alias` and `[libraries].alias` when present. Other sections and unrelated
    * lines are left untouched.

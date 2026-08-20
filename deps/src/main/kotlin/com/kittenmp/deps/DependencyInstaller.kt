@@ -18,13 +18,14 @@ class DependencyInstaller internal constructor(
   constructor(startDir: File = File(".").absoluteFile) : this(startDir, MavenCentralClient())
 
   private val versionCatalogEditor = VersionCatalogEditor()
+  private val buildGradleEditor = BuildGradleEditor()
 
   /**
    * Adds or updates [term] (`artifactId` or `group:artifactId`) and returns a one-line summary of
-   * what changed.
+   * what changed. When [module] is set, also wires the library into that module's build script.
    */
-  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
-  fun install(term: String): String {
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun install(term: String, module: String? = null): String {
     val catalogFile = findCatalog(startDir)
       ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
     val match = runBlocking { mavenCentralClient.findLatest(term) }
@@ -34,7 +35,10 @@ class DependencyInstaller internal constructor(
     if (result.content != original) {
       catalogFile.writeText(result.content)
     }
-    return summarize(result.change, alias, match)
+    val summary = summarize(result.change, alias, match)
+    if (module == null) return summary
+    val wired = addToModule(module, term, catalogFile)
+    return "$summary\n$wired"
   }
 
   /**
@@ -55,7 +59,52 @@ class DependencyInstaller internal constructor(
     return "removed $alias"
   }
 
+  /**
+   * Adds `implementation(libs…)` for an already-installed [term] to [module]'s build script.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun addToModule(module: String, term: String): String {
+    val catalogFile = findCatalog(startDir)
+      ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
+    return addToModule(module, term, catalogFile)
+  }
+
   override fun close() = mavenCentralClient.close()
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun addToModule(module: String, term: String, catalogFile: File): String {
+    val alias = sanitizeAlias(ArtifactQuery.parse(term).name)
+    val catalog = catalogFile.readText()
+    if (!versionCatalogEditor.containsLibrary(catalog, alias)) {
+      error("No library '$alias' in ${catalogFile.path}")
+    }
+    val projectRoot = catalogFile.parentFile.parentFile
+    val buildFile = findModuleBuildFile(projectRoot, module)
+      ?: error("Could not find build.gradle(.kts) for module '$module' under ${projectRoot.path}")
+    val original = buildFile.readText()
+    val result = buildGradleEditor.addImplementation(original, alias)
+    if (result.content != original) {
+      buildFile.writeText(result.content)
+    }
+    val accessor = buildGradleEditor.aliasToAccessor(alias)
+    return when (result.change) {
+      BuildGradleEditor.Change.ADDED -> "added implementation(libs.$accessor) to ${modulePath(module, buildFile)}"
+      BuildGradleEditor.Change.UNCHANGED -> "unchanged implementation(libs.$accessor) in ${modulePath(module, buildFile)}"
+    }
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun findModuleBuildFile(projectRoot: File, module: String): File? {
+    val moduleDir = File(projectRoot, module.trimStart(':').replace(':', '/'))
+    val kts = File(moduleDir, "build.gradle.kts")
+    if (kts.isFile) return kts
+    val groovy = File(moduleDir, "build.gradle")
+    return groovy.takeIf { it.isFile }
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun modulePath(module: String, buildFile: File): String =
+    "${module.trimStart(':')}/${buildFile.name}"
 
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun summarize(change: VersionCatalogEditor.Change, alias: String, match: ArtifactMatch): String {

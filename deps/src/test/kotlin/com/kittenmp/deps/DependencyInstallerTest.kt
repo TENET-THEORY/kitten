@@ -121,11 +121,74 @@ class DependencyInstallerTest {
     assertTrue("clikt" in failure.message.orEmpty())
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `addToModule wires an installed library into the module build script`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        clikt = "5.1.0"
+
+        [libraries]
+        clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+      """.trimIndent() + "\n",
+      moduleBuild = """
+        dependencies {
+        }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root).use { it.addToModule("app", "clikt") }
+
+    assertEquals("added implementation(libs.clikt) to app/build.gradle.kts", summary)
+    assertEquals(
+      """
+      dependencies {
+        implementation(libs.clikt)
+      }
+      """.trimIndent() + "\n",
+      File(root, "app/build.gradle.kts").readText(),
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `addToModule fails when the library is not in the catalog`() {
+    val root = tempProject(
+      catalog = "[versions]\n\n[libraries]\n",
+      moduleBuild = "dependencies {\n}\n",
+    )
+    val failure = assertFailsWith<IllegalStateException> {
+      installerFor(root).use { it.addToModule("app", "clikt") }
+    }
+    assertTrue("clikt" in failure.message.orEmpty())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `install with module updates catalog and build script`() {
+    val root = tempProject(
+      catalog = "[versions]\n\n[libraries]\n",
+      moduleBuild = "dependencies {\n}\n",
+    )
+
+    val summary = installerFor(root).use { it.install("clikt", module = "app") }
+
+    assertTrue(summary.startsWith("added clikt 5.1.0"), summary)
+    assertTrue("added implementation(libs.clikt) to app/build.gradle.kts" in summary, summary)
+    assertTrue("clikt = \"5.1.0\"" in File(root, "gradle/libs.versions.toml").readText())
+    assertTrue("implementation(libs.clikt)" in File(root, "app/build.gradle.kts").readText())
+  }
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
-  private fun tempProject(catalog: String): File {
+  private fun tempProject(catalog: String, moduleBuild: String? = null): File {
     val root = Files.createTempDirectory("kitten-project").toFile().also { it.deleteOnExit() }
     File(root, "gradle").mkdirs()
     File(root, "gradle/libs.versions.toml").writeText(catalog)
+    if (moduleBuild != null) {
+      File(root, "app").mkdirs()
+      File(root, "app/build.gradle.kts").writeText(moduleBuild)
+    }
     return root
   }
 

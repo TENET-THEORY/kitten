@@ -22,17 +22,34 @@ class Kitten : CliktCommand() {
 class Install : CliktCommand() {
 
   val artifactId by argument()
+  val module by option("--module")
 
-  @ComprehensionDebt
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.install(artifactId) })
+      echo(DependencyInstaller().use { it.install(artifactId, module) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to install dependency")
     }
     return
     if (currentContext.invokedSubcommand == null) {
       throw PrintHelpMessage(currentContext)
+    }
+  }
+}
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+class Add : CliktCommand() {
+
+  val module by argument()
+  val artifactId by argument()
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  override fun run() {
+    try {
+      echo(DependencyInstaller().use { it.addToModule(module, artifactId) })
+    } catch (e: Exception) {
+      throw CliktError(e.message ?: "Failed to add dependency to module")
     }
   }
 }
@@ -68,5 +85,5 @@ class New : CliktCommand() {
 }
 
 fun main(args: Array<String>) = Kitten()
-  .subcommands(New(), Install(), Uninstall())
+  .subcommands(New(), Install(), Add(), Uninstall())
   .main(args)
