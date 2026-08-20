@@ -2,9 +2,17 @@ package com.kittenmp.projectGenerator
 
 import com.kittenmp.ai.ComprehensionDebt
 import java.io.File
-import kotlin.jvm.javaClass
 
-private val BINARY_EXTENSIONS = setOf("jar", "js")
+/** Extensions copied byte for byte instead of having template tokens substituted. */
+private val VERBATIM_EXTENSIONS = setOf("jar", "js")
+
+/**
+ * Template files that ship without a leading dot and are restored to their dotted name on copy.
+ *
+ * Gradle's resource-processing default excludes drop `.gitignore` and `.gitattributes`, so they
+ * cannot be stored under their real names.
+ */
+private val DOTFILE_NAMES = setOf("gitignore", "gitattributes")
 
 internal class TemplateEntryCopier(
   private val targetDir: File,
@@ -13,49 +21,43 @@ internal class TemplateEntryCopier(
   private val basePackage: String
 ) {
 
-  @ComprehensionDebt
-  fun copy(
-    relativePath: String,
-  ) {
-    val outputRelativePath = mapOutputPath(
-      relativePath
-        .replace("__PACKAGE_PATH__", packagePath)
-        .replace('\\', '/')
-    )
-    val outputFile = File(targetDir, outputRelativePath)
-    outputFile.parentFile.mkdirs()
+  /** Copies one template entry into [targetDir], substituting tokens in text files. */
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  fun copy(relativePath: String) {
+    val outputFile = File(targetDir, outputPathFor(relativePath))
+    outputFile.parentFile?.mkdirs()
+
     val resourcePath = "$TEMPLATE_ROOT/$relativePath"
     val inputStream = requireNotNull(javaClass.getResourceAsStream("/$resourcePath")) {
       "missing template resource: $resourcePath"
     }
     inputStream.use { input ->
-      if (isBinary(relativePath)) {
+      if (isVerbatim(relativePath)) {
         outputFile.outputStream().use { output -> input.copyTo(output) }
       } else {
-        val content = input.reader().readText()
-          .replace("__PROJECT_NAME__", projectName)
-          .replace("__PACKAGE__", basePackage)
-          .replace("__PACKAGE_PATH__", packagePath)
-        outputFile.writeText(content)
+        outputFile.writeText(substituteTokens(input.reader().readText()))
       }
     }
   }
 
-  @ComprehensionDebt
-  private fun isBinary(relativePath: String): Boolean {
-    val name = relativePath.substringAfterLast('/')
-    val extension = name.substringAfterLast('.', missingDelimiterValue = "")
-    return extension in BINARY_EXTENSIONS
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun substituteTokens(content: String): String = content
+    .replace("__PROJECT_NAME__", projectName)
+    .replace("__PACKAGE__", basePackage)
+    .replace("__PACKAGE_PATH__", packagePath)
+
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun isVerbatim(relativePath: String): Boolean =
+    fileNameOf(relativePath).substringAfterLast('.', missingDelimiterValue = "") in VERBATIM_EXTENSIONS
+
+  /** Expands the package-path token and restores dotted names such as `gitignore` -> `.gitignore`. */
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun outputPathFor(relativePath: String): String {
+    val path = relativePath.replace('\\', '/').replace("__PACKAGE_PATH__", packagePath)
+    val name = fileNameOf(path)
+    return if (name in DOTFILE_NAMES) path.dropLast(name.length) + ".$name" else path
   }
 
-  @ComprehensionDebt
-  private fun mapOutputPath(relativePath: String): String =
-    when {
-      relativePath == "gitignore" || relativePath.endsWith("/gitignore") ->
-        relativePath.replace(Regex("(^|/)gitignore$"), "$1.gitignore")
-      relativePath == "gitattributes" || relativePath.endsWith("/gitattributes") ->
-        relativePath.replace(Regex("(^|/)gitattributes$"), "$1.gitattributes")
-      else -> relativePath
-    }
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun fileNameOf(path: String): String = path.substringAfterLast('/')
 }
-

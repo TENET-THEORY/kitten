@@ -1,56 +1,62 @@
 package com.kittenmp.deps
 
 import com.kittenmp.ai.ComprehensionDebt
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
-@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-class DependencyInstaller(
-  private val startDir: File = File(".").absoluteFile,
-) {
-  private val mavenCentralClient = MavenCentralClient()
+/**
+ * Resolves a Maven Central artifact and writes it into the nearest `gradle/libs.versions.toml`.
+ *
+ * Holds an HTTP client, so callers must [close] it — `DependencyInstaller().use { ... }`.
+ */
+@ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+class DependencyInstaller internal constructor(
+  private val startDir: File,
+  private val mavenCentralClient: MavenCentralClient,
+) : AutoCloseable {
+
+  constructor(startDir: File = File(".").absoluteFile) : this(startDir, MavenCentralClient())
+
   private val versionCatalogEditor = VersionCatalogEditor()
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  fun install(artifactId: String): String {
+  /**
+   * Adds or updates [term] (`artifactId` or `group:artifactId`) and returns a one-line summary of
+   * what changed.
+   */
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  fun install(term: String): String {
     val catalogFile = findCatalog(startDir)
       ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
-    val match = mavenCentralClient.findLatest(artifactId)
+    val match = runBlocking { mavenCentralClient.findLatest(term) }
     val alias = sanitizeAlias(match.name)
     val original = catalogFile.readText()
-    val hadAlias = hasAlias(original, alias)
     val result = versionCatalogEditor.upsert(original, alias, match)
     if (result.content != original) {
       catalogFile.writeText(result.content)
     }
-    val action = when {
-      !result.updated -> "unchanged"
-      hadAlias -> "updated"
-      else -> "added"
-    }
-    return "$action $alias ${match.version} (${match.group}:${match.name})"
+    return summarize(result.change, alias, match)
   }
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  private fun hasAlias(catalog: String, alias: String): Boolean =
-    Regex("""(?m)^${Regex.escape(alias)}\s*=""").containsMatchIn(catalog)
+  override fun close() = mavenCentralClient.close()
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  private fun findCatalog(from: File): File? {
-    var dir: File? = from
-    while (dir != null) {
-      val candidate = File(dir, "gradle/libs.versions.toml")
-      if (candidate.isFile) return candidate
-      dir = dir.parentFile
-    }
-    return null
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun summarize(change: VersionCatalogEditor.Change, alias: String, match: ArtifactMatch): String {
+    val summary = "${change.name.lowercase()} $alias ${match.version} (${match.coordinate})"
+    if (match.alternatives.isEmpty()) return summary
+    return "$summary\nother artifacts named '${match.name}': ${match.alternatives.joinToString()}"
   }
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  /** Walks up from [from] to the first directory containing a Gradle version catalog. */
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  private fun findCatalog(from: File): File? = generateSequence(from) { it.parentFile }
+    .map { File(it, "gradle/libs.versions.toml") }
+    .firstOrNull { it.isFile }
+
+  /** Converts an artifact name into a version catalog alias (lowercase, `-` separated). */
+  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun sanitizeAlias(artifactId: String): String =
     artifactId
       .lowercase()
-      .replace('_', '-')
-      .replace('.', '-')
-      .replace(Regex("[^a-z0-9-]"), "-")
+      .replace(Regex("[^a-z0-9]+"), "-")
       .trim('-')
 }

@@ -26,7 +26,7 @@ class Kitten : CliktCommand() {
     val artifactId = install
     if (artifactId != null) {
       try {
-        echo(DependencyInstaller().install(artifactId))
+        echo(DependencyInstaller().use { it.install(artifactId) })
       } catch (e: Exception) {
         throw CliktError(e.message ?: "Failed to install dependency")
       }
