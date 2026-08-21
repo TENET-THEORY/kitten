@@ -1,0 +1,14 @@
+# Render Blueprint.
+#
+# The build context MUST be the repository root: website/settings.gradle.kts
+# includes the sibling :ai module via `project(":ai").projectDir = file("../ai")`,
+# so website/Dockerfile copies both ai/ and website/ from the root.
+
+services:
+  - type: web
+    name: kitten-website
+    runtime: docker
+    dockerfilePath: ./website/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /
