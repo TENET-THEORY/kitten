@@ -6,6 +6,7 @@ import kotlinx.html.HTML
 import kotlinx.html.a
 import kotlinx.html.body
 import kotlinx.html.div
+import kotlinx.html.em
 import kotlinx.html.h1
 import kotlinx.html.h2
 import kotlinx.html.h3
@@ -32,7 +33,8 @@ fun HTML.homePage() {
       content =
         "Kitten is a CLI for scaffolding Kotlin projects and managing Gradle version-catalog dependencies.",
     )
-    title("Kitten")
+    meta(name = "theme-color", content = "#f88909")
+    title("Kitten — a small CLI with sharp claws")
     link(rel = "preconnect", href = "https://fonts.googleapis.com")
     link(rel = "preconnect", href = "https://fonts.gstatic.com") {
       attributes["crossorigin"] = "anonymous"
@@ -81,14 +83,18 @@ private fun FlowContent.hero() {
       }
     }
     div(classes = "hero-copy") {
-      p(classes = "brand") { +"Kitten" }
-      h1 { +"Scaffold Kotlin. Manage catalogs." }
+      p(classes = "badge") { +"small CLI, sharp claws" }
+      p(classes = "brand") {
+        +"Kitten"
+        span(classes = "brand-dot") { +"." }
+      }
+      h1 { +"Scaffold Kotlin. Wrangle catalogs. Skip the yak shaving." }
       p(classes = "lede") {
-        +"A CLI for new Kotlin projects and Gradle version-catalog dependencies — install from Maven Central, wire modules, and talk to ktorLibs."
+        +"A CLI for new Kotlin projects and Gradle version-catalog dependencies — pounce on Maven Central, wire up modules, and speak fluent ktorLibs."
       }
       div(classes = "cta-row") {
-        a(href = "#get-started", classes = "cta") { +"Get started" }
-        a(href = "#commands", classes = "cta cta-quiet") { +"Commands" }
+        a(href = "#get-started", classes = "cta") { +"Let it loose" }
+        a(href = "#commands", classes = "cta cta-quiet") { +"Poke at the commands" }
       }
     }
   }
@@ -98,7 +104,11 @@ private fun FlowContent.hero() {
 private fun FlowContent.getStarted() {
   section(classes = "band") {
     id = "get-started"
-    h2 { +"Run" }
+    span(classes = "eyebrow") { +"01 — feed it" }
+    h2 {
+      +"Get it "
+      em { +"running" }
+    }
     p {
       +"From the Kitten repo, invoke the app through Gradle, or install a local binary and call "
       span(classes = "inline-code") { +"kitten" }
@@ -116,9 +126,14 @@ private fun FlowContent.getStarted() {
 private fun FlowContent.commands() {
   section(classes = "band") {
     id = "commands"
-    h2 { +"Commands" }
+    span(classes = "eyebrow") { +"02 — the litter" }
+    h2 {
+      +"Four "
+      em { +"commands" }
+      +", no fuss"
+    }
     p(classes = "section-lede") {
-      +"Four subcommands cover scaffolding and catalog work. Dependency commands walk up from the working directory to find "
+      +"Scaffolding and catalog work, covered. Dependency commands walk up from the working directory to find "
       span(classes = "inline-code") { +"gradle/libs.versions.toml" }
       +"."
     }
@@ -175,7 +190,11 @@ private fun FlowContent.commands() {
 private fun FlowContent.notes() {
   section(classes = "band band-last") {
     id = "notes"
-    h2 { +"Notes" }
+    span(classes = "eyebrow") { +"03 — house rules" }
+    h2 {
+      +"Small print, "
+      em { +"few surprises" }
+    }
     h3 { +"Modules & catalogs" }
     p {
       +"Dependency commands require a "
@@ -234,7 +253,7 @@ private fun FlowContent.notes() {
 private fun FlowContent.siteFooter() {
   div(classes = "footer") {
     p {
-      +"Kitten · scaffolding and version catalogs for Kotlin"
+      +"Kitten · scaffolding and version catalogs for Kotlin · no yaks were shaved"
     }
   }
 }
