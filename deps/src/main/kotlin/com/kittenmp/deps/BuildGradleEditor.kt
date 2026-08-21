@@ -16,18 +16,22 @@ internal class BuildGradleEditor {
   data class Result(val content: String, val change: Change)
 
   /**
-   * Ensures `implementation(libs.<accessor>)` is present for [alias]. Hyphens in the alias become
-   * dots in the Gradle accessor (`ktor-client-core` → `libs.ktor.client.core`).
+   * Ensures `implementation(<catalog>.<accessor>)` is present for [alias]. Hyphens in the alias
+   * become dots in the Gradle accessor (`server-core` → `ktorLibs.server.core`).
    */
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  fun addImplementation(script: String, alias: String): Result {
+  fun addImplementation(
+    script: String,
+    alias: String,
+    catalogExtension: String = DEFAULT_CATALOG_EXTENSION,
+  ): Result {
     val accessor = aliasToAccessor(alias)
-    val entry = "implementation(libs.$accessor)"
+    val entry = "implementation($catalogExtension.$accessor)"
     val newline = if (script.contains("\r\n")) "\r\n" else "\n"
     val endsWithNewline = script.isEmpty() || script.endsWith("\n")
     val lines = script.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
 
-    if (lines.any { isSameImplementation(it, accessor) }) {
+    if (lines.any { isSameImplementation(it, catalogExtension, accessor) }) {
       return Result(script, Change.UNCHANGED)
     }
 
@@ -42,14 +46,18 @@ internal class BuildGradleEditor {
     return Result(content, Change.ADDED)
   }
 
-  /** Converts a version-catalog alias into a `libs.` accessor path. */
+  /** Converts a version-catalog alias into a catalog accessor path. */
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   fun aliasToAccessor(alias: String): String = alias.replace('-', '.')
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  private fun isSameImplementation(line: String, accessor: String): Boolean {
+  private fun isSameImplementation(
+    line: String,
+    catalogExtension: String,
+    accessor: String,
+  ): Boolean {
     val normalized = line.trim().replace(Regex("\\s+"), "")
-    return normalized == "implementation(libs.$accessor)"
+    return normalized == "implementation($catalogExtension.$accessor)"
   }
 
   /**
@@ -134,6 +142,7 @@ internal class BuildGradleEditor {
   }
 
   companion object {
+    const val DEFAULT_CATALOG_EXTENSION = "libs"
     private val DEPENDENCIES_OPEN = Regex("""^dependencies\s*\{.*$""")
   }
 }

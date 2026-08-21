@@ -13,6 +13,11 @@ import java.io.File
 class DependencyInstaller internal constructor(
   private val startDir: File,
   private val mavenCentralClient: MavenCentralClient,
+  private val ktorLibsCatalog: KtorLibsCatalog = KtorLibsCatalog(
+    catalogTomlLoader = CatalogTomlLoader { group, name, version ->
+      runBlocking { mavenCentralClient.downloadArtifact(group, name, version, "toml") }
+    },
+  ),
 ) : AutoCloseable {
 
   constructor(startDir: File = File(".").absoluteFile) : this(startDir, MavenCentralClient())
@@ -60,7 +65,9 @@ class DependencyInstaller internal constructor(
   }
 
   /**
-   * Adds `implementation(libs…)` for an already-installed [term] to [module]'s build script.
+   * Adds `implementation(libs…)` or `implementation(ktorLibs…)` for [term] to [module]'s build
+   * script. Local `libs.versions.toml` wins; otherwise the project's published `ktorLibs` catalog
+   * is used when present.
    */
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   fun addToModule(module: String, term: String): String {
@@ -73,25 +80,58 @@ class DependencyInstaller internal constructor(
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   private fun addToModule(module: String, term: String, catalogFile: File): String {
-    val alias = sanitizeAlias(ArtifactQuery.parse(term).name)
-    val catalog = catalogFile.readText()
-    if (!versionCatalogEditor.containsLibrary(catalog, alias)) {
-      error("No library '$alias' in ${catalogFile.path}")
-    }
     val projectRoot = catalogFile.parentFile.parentFile
+    val resolved = resolveLibrary(term, catalogFile, projectRoot)
+      ?: error(missingLibraryMessage(term, catalogFile, projectRoot))
     val buildFile = findModuleBuildFile(projectRoot, module)
       ?: error("Could not find build.gradle(.kts) for module '$module' under ${projectRoot.path}")
     val original = buildFile.readText()
-    val result = buildGradleEditor.addImplementation(original, alias)
+    val result = buildGradleEditor.addImplementation(original, resolved.alias, resolved.extension)
     if (result.content != original) {
       buildFile.writeText(result.content)
     }
-    val accessor = buildGradleEditor.aliasToAccessor(alias)
+    val accessor = buildGradleEditor.aliasToAccessor(resolved.alias)
+    val reference = "${resolved.extension}.$accessor"
     return when (result.change) {
-      BuildGradleEditor.Change.ADDED -> "added implementation(libs.$accessor) to ${modulePath(module, buildFile)}"
-      BuildGradleEditor.Change.UNCHANGED -> "unchanged implementation(libs.$accessor) in ${modulePath(module, buildFile)}"
+      BuildGradleEditor.Change.ADDED -> "added implementation($reference) to ${modulePath(module, buildFile)}"
+      BuildGradleEditor.Change.UNCHANGED -> "unchanged implementation($reference) in ${modulePath(module, buildFile)}"
     }
   }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun resolveLibrary(
+    term: String,
+    catalogFile: File,
+    projectRoot: File,
+  ): ResolvedLibrary? {
+    val alias = sanitizeAlias(ArtifactQuery.parse(term).name)
+    if (versionCatalogEditor.containsLibrary(catalogFile.readText(), alias)) {
+      return ResolvedLibrary(alias, BuildGradleEditor.DEFAULT_CATALOG_EXTENSION)
+    }
+    return resolveFromKtorLibs(term, projectRoot)
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun resolveFromKtorLibs(term: String, projectRoot: File): ResolvedLibrary? {
+    val coordinate = ktorLibsCatalog.findCoordinate(projectRoot) ?: return null
+    val toml = ktorLibsCatalog.loadToml(coordinate)
+    val alias = ktorLibsCatalog.resolveAlias(toml, term) ?: return null
+    return ResolvedLibrary(alias, KtorLibsCatalog.EXTENSION)
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private fun missingLibraryMessage(term: String, catalogFile: File, projectRoot: File): String {
+    val alias = sanitizeAlias(ArtifactQuery.parse(term).name)
+    val ktorHint = if (ktorLibsCatalog.findCoordinate(projectRoot) != null) {
+      " or ${KtorLibsCatalog.EXTENSION}"
+    } else {
+      ""
+    }
+    return "No library '$alias' in ${catalogFile.path}$ktorHint"
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  private data class ResolvedLibrary(val alias: String, val extension: String)
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   private fun findModuleBuildFile(projectRoot: File, module: String): File? {

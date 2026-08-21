@@ -27,6 +27,26 @@ internal class MavenCentralClient(
 ) : AutoCloseable {
 
   /**
+   * Downloads a published artifact file from Maven Central's repository layout (not the search
+   * API), e.g. a version-catalog `.toml`.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  suspend fun downloadArtifact(
+    group: String,
+    name: String,
+    version: String,
+    extension: String,
+  ): String {
+    val groupPath = group.replace('.', '/')
+    val url = "$CENTRAL_REPO_URL/$groupPath/$name/$version/$name-$version.$extension"
+    val response = client.get(url)
+    if (!response.status.isSuccess()) {
+      error("Failed to download $group:$name:$version.$extension (HTTP ${response.status.value})")
+    }
+    return response.bodyAsText()
+  }
+
+  /**
    * Resolves [term] (`artifactId` or `group:artifactId`) to the newest release on Maven Central.
    *
    * Throws if nothing matches. When several groups publish the same artifact name the newest one
@@ -121,6 +141,7 @@ internal class MavenCentralClient(
      * since superseded), so queries go to the current Central endpoint instead.
      */
     const val CENTRAL_SEARCH_URL = "https://central.sonatype.com/solrsearch/select"
+    const val CENTRAL_REPO_URL = "https://repo1.maven.org/maven2"
 
     private const val SEARCH_ROWS = 20
     private const val CONNECT_TIMEOUT_MILLIS = 30_000L

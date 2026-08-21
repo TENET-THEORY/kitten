@@ -114,6 +114,30 @@ class BuildGradleEditorTest {
 
   @Test
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `uses a custom catalog extension`() {
+    val script = "dependencies {\n}\n"
+
+    val result = editor.addImplementation(script, "server-core", catalogExtension = "ktorLibs")
+
+    assertEquals(true, "implementation(ktorLibs.server.core)" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  fun `custom catalog duplicates are detected`() {
+    val script = """
+      dependencies {
+        implementation(ktorLibs.server.core)
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "server-core", catalogExtension = "ktorLibs")
+
+    assertEquals(BuildGradleEditor.Change.UNCHANGED, result.change)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   fun `expands an inline empty dependencies block`() {
     val script = "plugins {}\n\ndependencies { }\n"
 

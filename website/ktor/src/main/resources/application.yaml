@@ -1,0 +1,6 @@
+ktor:
+  application:
+    modules:
+      - com.kittenmp.website.RoutingKt.routing
+  deployment:
+    port: 8080
