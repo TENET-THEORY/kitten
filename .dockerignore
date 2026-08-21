@@ -1,0 +1,8 @@
+.git
+.idea
+.kotlin
+**/.gradle
+**/build
+**/.DS_Store
+**/terminals
+agent-transcripts
