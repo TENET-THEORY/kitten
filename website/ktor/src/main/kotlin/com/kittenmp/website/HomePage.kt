@@ -49,6 +49,7 @@ fun HTML.homePage() {
   body {
     hero()
     main {
+      missingTool()
       getStarted()
       commands()
       notes()
@@ -101,10 +102,45 @@ private fun FlowContent.hero() {
 }
 
 @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+private fun FlowContent.missingTool() {
+  section(classes = "band band-pitch") {
+    id = "why"
+    span(classes = "eyebrow") { +"01 — the gap" }
+    h2 {
+      +"The missing CLI tool for "
+      em { +"Kotlin" }
+    }
+    p(classes = "section-lede") {
+      +"Other ecosystems have rich CLI tools for starting projects and managing dependencies — "
+      span(classes = "inline-code") { +"npm" }
+      +" and "
+      span(classes = "inline-code") { +"pip" }
+      +" among them. Kotlin has had you hand-editing a version catalog and copying a build script from the last project. Kitten fills that gap."
+    }
+    div(classes = "ecosystems") {
+      ecosystemCard("npm", "node", "npm init · npm install")
+      ecosystemCard("pip", "python", "pip install")
+      ecosystemCard("cargo", "rust", "cargo new · cargo add")
+      ecosystemCard("kitten", "kotlin", "kitten new · kitten install")
+    }
+  }
+}
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+private fun FlowContent.ecosystemCard(tool: String, ecosystem: String, usage: String) {
+  val highlight = if (tool == "kitten") " is-kitten" else ""
+  div(classes = "ecosystem$highlight") {
+    p(classes = "ecosystem-tool") { +tool }
+    p(classes = "ecosystem-lang") { +ecosystem }
+    p(classes = "ecosystem-usage") { +usage }
+  }
+}
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 private fun FlowContent.getStarted() {
   section(classes = "band") {
     id = "get-started"
-    span(classes = "eyebrow") { +"01 — feed it" }
+    span(classes = "eyebrow") { +"02 — feed it" }
     h2 {
       +"Get it "
       em { +"running" }
@@ -126,7 +162,7 @@ private fun FlowContent.getStarted() {
 private fun FlowContent.commands() {
   section(classes = "band") {
     id = "commands"
-    span(classes = "eyebrow") { +"02 — the litter" }
+    span(classes = "eyebrow") { +"03 — the litter" }
     h2 {
       +"Four "
       em { +"commands" }
@@ -190,7 +226,7 @@ private fun FlowContent.commands() {
 private fun FlowContent.notes() {
   section(classes = "band band-last") {
     id = "notes"
-    span(classes = "eyebrow") { +"03 — house rules" }
+    span(classes = "eyebrow") { +"04 — house rules" }
     h2 {
       +"Small print, "
       em { +"few surprises" }

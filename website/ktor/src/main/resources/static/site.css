@@ -326,6 +326,67 @@ main {
   color: var(--ink-soft);
 }
 
+.band-pitch {
+  padding-top: clamp(2.25rem, 6vw, 3.5rem);
+}
+
+.ecosystems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  margin-top: 1.75rem;
+}
+
+.ecosystem {
+  padding: 1rem 1.1rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.45);
+  transform: rotate(-0.6deg);
+}
+
+.ecosystem:nth-child(even) {
+  transform: rotate(0.7deg);
+}
+
+.ecosystem.is-kitten {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0.4rem 0.4rem 0 rgba(44, 28, 13, 0.18);
+  transform: rotate(-1.6deg) scale(1.03);
+}
+
+.ecosystem p {
+  margin: 0;
+}
+
+.ecosystem-tool {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ecosystem-lang {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ecosystem.is-kitten .ecosystem-lang {
+  color: rgba(42, 23, 4, 0.72);
+}
+
+.ecosystem-usage {
+  margin-top: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 .command {
   margin-top: 1.4rem;
   padding: 1.35rem 1.5rem;
@@ -456,6 +517,12 @@ main {
 
   .cta:hover,
   .command:hover {
+    transform: none;
+  }
+
+  .ecosystem,
+  .ecosystem:nth-child(even),
+  .ecosystem.is-kitten {
     transform: none;
   }
 }
