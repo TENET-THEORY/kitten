@@ -60,6 +60,24 @@ kitten uninstall clikt
 kitten uninstall com.github.ajalt.clikt:clikt
 ```
 
+## Roadmap
+
+Not built yet. Next up is richer project init, then Phoenix-style generators that cut across the server, website, and a Kotlin Multiplatform app.
+
+### Init
+
+**Ktor library picker.** When you run `kitten new --type ktor`, a checkbox menu lets you pick the Ktor libraries you actually want — auth, websockets, content negotiation, and so on — instead of always getting the same default template.
+
+**Kotlin Multiplatform.** A project type for KMP apps, so `kitten new` can scaffold a multiplatform project the same way it currently does plain Kotlin and Ktor.
+
+### Phoenix-like scaffolding
+
+Inspired by Phoenix generators: one command writes the boring layers, consistently, across the stack.
+
+**CRUD generators.** Scaffold a resource end to end — not only Ktor routes and HTML, but the matching pieces in the website and the KMP app (models, clients, screens).
+
+**Feature packs.** One command to drop auth into an application. Same shape for Stripe, RevenueCat, and further integrations later: wire dependencies, config, and the call sites instead of copying a gist.
+
 ## Notes
 
 Dependency commands require a `gradle/libs.versions.toml` somewhere above the working directory. Module paths can be `app` or `:app` (nested modules use `:` → `/`, e.g. `:feature:auth` → `feature/auth`).

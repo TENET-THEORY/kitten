@@ -11,7 +11,7 @@
   --phosphor: #ffb454;
   --phosphor-dim: #b57a34;
   --line: rgba(44, 28, 13, 0.16);
-  --font-display: "Syne", sans-serif;
+  --font-display: "Fredoka", "Trebuchet MS", sans-serif;
   --font-body: "Work Sans", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --pad: clamp(1.25rem, 4vw, 3.5rem);
@@ -50,9 +50,18 @@ a {
   position: relative;
   min-height: 100svh;
   display: grid;
-  align-items: end;
+  grid-template-rows: 1fr auto;
   overflow-x: clip;
   isolation: isolate;
+}
+
+.hero-terminal {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  width: min(100%, var(--max));
+  margin: 0 auto;
+  padding: clamp(3rem, 9vh, 5.5rem) var(--pad) clamp(1.5rem, 4vh, 3rem);
 }
 
 .hero-plane {
@@ -66,12 +75,9 @@ a {
 }
 
 .terminal {
-  position: absolute;
-  inset: 13% 6% auto;
-  max-width: 52rem;
+  position: relative;
+  max-width: 42rem;
   margin-inline: auto;
-  left: 0;
-  right: 0;
   border: 2px solid rgba(248, 137, 9, 0.42);
   border-radius: var(--radius);
   background: rgba(20, 12, 4, 0.9);
@@ -186,12 +192,12 @@ a {
 }
 
 .brand {
-  display: inline-block;
+  width: fit-content;
   margin: 0 0 0.75rem;
   font-family: var(--font-display);
   font-size: clamp(3.4rem, 12vw, 7.5rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.18;
   letter-spacing: -0.04em;
   color: var(--accent);
   text-shadow: 0.22rem 0.22rem 0 rgba(44, 28, 13, 0.55);
@@ -210,7 +216,7 @@ a {
 
 .hero-copy h1 {
   margin: 0 0 0.85rem;
-  max-width: 15ch;
+  max-width: 17ch;
   font-family: var(--font-display);
   font-size: clamp(1.55rem, 3.6vw, 2.45rem);
   font-weight: 700;
@@ -273,12 +279,15 @@ main {
 .band {
   padding: clamp(2.75rem, 7vw, 4.5rem) 0;
   border-bottom: 2px dashed var(--line);
+}
+
+.js .band {
   opacity: 0;
   transform: translateY(1rem);
   transition: opacity 0.7s ease, transform 0.7s ease;
 }
 
-.band.is-visible {
+.js .band.is-visible {
   opacity: 1;
   transform: none;
 }
@@ -420,6 +429,42 @@ main {
   font-family: var(--font-mono);
 }
 
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.roadmap-card {
+  padding: 1.25rem 1.35rem;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0.3rem 0.3rem 0 rgba(248, 137, 9, 0.12);
+}
+
+.roadmap-card h3 {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.roadmap-card p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.roadmap-status {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .inline-code {
   padding: 0.08em 0.3em;
   border: 1px solid var(--line);
@@ -484,9 +529,36 @@ main {
   }
 }
 
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+    grid-template-rows: 1fr;
+    align-items: center;
+    column-gap: clamp(1.5rem, 4vw, 3rem);
+    padding-inline: max(var(--pad), calc((100% - var(--max)) / 2));
+  }
+
+  .hero-copy {
+    grid-area: 1 / 1;
+    width: auto;
+    margin: 0;
+    padding: var(--pad) 0;
+  }
+
+  .hero-terminal {
+    grid-area: 1 / 2;
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .terminal {
+    max-width: none;
+  }
+}
+
 @media (max-width: 720px) {
   .terminal {
-    inset: 9% 4% auto;
     transform: perspective(900px) rotateX(4deg) rotateY(-3deg) rotate(-1deg);
   }
 

@@ -1,7 +1,8 @@
 (() => {
+  const root = document.documentElement;
   const bands = document.querySelectorAll(".band");
   if (!("IntersectionObserver" in window) || bands.length === 0) {
-    bands.forEach((band) => band.classList.add("is-visible"));
+    root.classList.remove("js");
     return;
   }
 
@@ -18,4 +19,9 @@
   );
 
   bands.forEach((band) => observer.observe(band));
+
+  window.setTimeout(() => {
+    observer.disconnect();
+    bands.forEach((band) => band.classList.add("is-visible"));
+  }, 2500);
 })();

@@ -22,6 +22,7 @@ import kotlinx.html.script
 import kotlinx.html.section
 import kotlinx.html.span
 import kotlinx.html.title
+import kotlinx.html.unsafe
 
 @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 fun HTML.homePage() {
@@ -42,9 +43,10 @@ fun HTML.homePage() {
     link(
       rel = "stylesheet",
       href =
-        "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap",
+        "https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@400;500;600&display=swap",
     )
     link(rel = "stylesheet", href = "/assets/site.css")
+    script { unsafe { +"document.documentElement.classList.add('js')" } }
   }
   body {
     hero()
@@ -52,6 +54,7 @@ fun HTML.homePage() {
       missingTool()
       getStarted()
       commands()
+      roadmap()
       notes()
     }
     siteFooter()
@@ -62,8 +65,8 @@ fun HTML.homePage() {
 @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 private fun FlowContent.hero() {
   header(classes = "hero") {
-    div(classes = "hero-plane") {
-      attributes["aria-hidden"] = "true"
+    div(classes = "hero-plane") { attributes["aria-hidden"] = "true" }
+    div(classes = "hero-terminal") {
       div(classes = "terminal") {
         div(classes = "terminal-chrome") {
           span(classes = "dot")
@@ -95,7 +98,7 @@ private fun FlowContent.hero() {
       }
       div(classes = "cta-row") {
         a(href = "#get-started", classes = "cta") { +"Let it loose" }
-        a(href = "#commands", classes = "cta cta-quiet") { +"Poke at the commands" }
+        a(href = "#roadmap", classes = "cta cta-quiet") { +"What's next" }
       }
     }
   }
@@ -223,10 +226,63 @@ private fun FlowContent.commands() {
 }
 
 @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+private fun FlowContent.roadmap() {
+  section(classes = "band") {
+    id = "roadmap"
+    span(classes = "eyebrow") { +"04 — next" }
+    h2 {
+      +"Roadmap, "
+      em { +"not built yet" }
+    }
+    p(classes = "section-lede") {
+      +"Richer project init first, then Phoenix-style generators that cut across the server, the website, and a Kotlin Multiplatform app."
+    }
+    h3 { +"Init" }
+    div(classes = "roadmap-grid") {
+      roadmapCard(
+        title = "Ktor library picker",
+        detail =
+          "When you run kitten new --type ktor, a checkbox menu lets you pick the Ktor libraries you actually want — auth, websockets, content negotiation, and so on — instead of always getting the same default template.",
+      )
+      roadmapCard(
+        title = "Kotlin Multiplatform",
+        detail =
+          "A project type for KMP apps, so kitten new can scaffold a multiplatform project the same way it currently does plain Kotlin and Ktor.",
+      )
+    }
+    h3 { +"Phoenix-like scaffolding" }
+    p {
+      +"Inspired by Phoenix generators: one command writes the boring layers, consistently, across the stack."
+    }
+    div(classes = "roadmap-grid") {
+      roadmapCard(
+        title = "CRUD generators",
+        detail =
+          "Scaffold a resource end to end — not only Ktor routes and HTML, but the matching pieces in the website and the KMP app: models, clients, screens.",
+      )
+      roadmapCard(
+        title = "Feature packs",
+        detail =
+          "One command to drop auth into an application. Same shape for Stripe, RevenueCat, and further integrations later: wire dependencies, config, and the call sites instead of copying a gist.",
+      )
+    }
+  }
+}
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+private fun FlowContent.roadmapCard(title: String, detail: String) {
+  div(classes = "roadmap-card") {
+    p(classes = "roadmap-status") { +"planned" }
+    h3 { +title }
+    p { +detail }
+  }
+}
+
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
 private fun FlowContent.notes() {
   section(classes = "band band-last") {
     id = "notes"
-    span(classes = "eyebrow") { +"04 — house rules" }
+    span(classes = "eyebrow") { +"05 — house rules" }
     h2 {
       +"Small print, "
       em { +"few surprises" }
