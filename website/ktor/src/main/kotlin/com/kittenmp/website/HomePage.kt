@@ -235,7 +235,7 @@ private fun FlowContent.roadmap() {
       em { +"not built yet" }
     }
     p(classes = "section-lede") {
-      +"Richer project init first, then Phoenix-style generators that cut across the server, the website, and a Kotlin Multiplatform app."
+      +"Richer project init and creating modules first, then Phoenix-style generators that cut across the server, the website, and a Kotlin Multiplatform app."
     }
     h3 { +"Init" }
     div(classes = "roadmap-grid") {
@@ -248,6 +248,11 @@ private fun FlowContent.roadmap() {
         title = "Kotlin Multiplatform",
         detail =
           "A project type for KMP apps, so kitten new can scaffold a multiplatform project the same way it currently does plain Kotlin and Ktor.",
+      )
+      roadmapCard(
+        title = "Creating modules",
+        detail =
+          "Add a Gradle module to an existing project — directory, build.gradle.kts, and settings.gradle.kts include — instead of wiring that by hand.",
       )
     }
     h3 { +"Phoenix-like scaffolding" }

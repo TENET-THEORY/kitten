@@ -62,13 +62,15 @@ kitten uninstall com.github.ajalt.clikt:clikt
 
 ## Roadmap
 
-Not built yet. Next up is richer project init, then Phoenix-style generators that cut across the server, website, and a Kotlin Multiplatform app.
+Not built yet. Next up is richer project init and creating modules, then Phoenix-style generators that cut across the server, website, and a Kotlin Multiplatform app.
 
 ### Init
 
 **Ktor library picker.** When you run `kitten new --type ktor`, a checkbox menu lets you pick the Ktor libraries you actually want — auth, websockets, content negotiation, and so on — instead of always getting the same default template.
 
 **Kotlin Multiplatform.** A project type for KMP apps, so `kitten new` can scaffold a multiplatform project the same way it currently does plain Kotlin and Ktor.
+
+**Creating modules.** Add a Gradle module to an existing project — directory, `build.gradle.kts`, and `settings.gradle.kts` include — instead of wiring that by hand.
 
 ### Phoenix-like scaffolding
 
