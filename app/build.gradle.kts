@@ -4,6 +4,8 @@ plugins {
     application
 }
 
+version = "0.1.0"
+
 dependencies {
   implementation(libs.clikt)
   implementation(libs.mosaic.runtime)
