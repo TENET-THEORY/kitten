@@ -149,7 +149,15 @@ private fun FlowContent.getStarted() {
       em { +"running" }
     }
     p {
-      +"From the Kitten repo, invoke the app through Gradle, or install a local binary and call "
+      +"Install with Homebrew — needs Java 21, pulled in automatically via "
+      span(classes = "inline-code") { +"openjdk@21" }
+      +"."
+    }
+    pre(classes = "snippet") {
+      +"brew install tenet-theory/tap/kitten"
+    }
+    p {
+      +"Or build from source: invoke the app through Gradle, or install a local binary and call "
       span(classes = "inline-code") { +"kitten" }
       +" directly."
     }
