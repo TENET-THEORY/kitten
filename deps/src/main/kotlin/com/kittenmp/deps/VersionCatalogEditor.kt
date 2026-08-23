@@ -58,6 +58,8 @@ internal class VersionCatalogEditor {
   /**
    * Points `[versions]` and `[plugins].alias` at [match], creating either section if the catalog
    * does not have one yet. When the plugin already exists, its existing `version.ref` is reused.
+   * New Kotlin Gradle plugins share `[versions].kotlin` (or a sibling plugin's ref) instead of
+   * minting a per-plugin version.
    */
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun upsertPlugin(catalog: String, alias: String, match: PluginMatch): UpsertResult {
@@ -65,12 +67,13 @@ internal class VersionCatalogEditor {
     val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
     val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
     val existing = pluginLine(lines, alias)
-    val versionAlias = existing?.let { versionRefOf(it) } ?: alias
+    val versionAlias = existing?.let { versionRefOf(it) }
+      ?: choosePluginVersionAlias(lines, match.id, alias)
 
-    val afterVersions = if (existing != null && versionRefOf(existing) == null) {
-      EntryUpsert(lines, Change.UNCHANGED)
-    } else {
-      upsertEntry(
+    val afterVersions = when {
+      existing != null && versionRefOf(existing) == null -> EntryUpsert(lines, Change.UNCHANGED)
+      existing == null && hasVersion(lines, versionAlias) -> EntryUpsert(lines, Change.UNCHANGED)
+      else -> upsertEntry(
         lines = lines,
         section = VERSIONS_SECTION,
         alias = versionAlias,
@@ -134,10 +137,19 @@ internal class VersionCatalogEditor {
     return sanitizeAlias(match.id)
   }
 
-  /** Last two dotted segments of a plugin id, as a catalog alias (`kotlin.jvm` → `kotlin-jvm`). */
+  /**
+   * Catalog alias for a plugin id. Kotlin Gradle plugins drop the `org.jetbrains.kotlin` prefix
+   * and a `plugin` segment (`org.jetbrains.kotlin.plugin.compose` → `kotlin-compose`); everything
+   * else uses the last two dotted segments.
+   */
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun pluginAliasFromId(pluginId: String): String {
     val parts = pluginId.split('.').filter { it.isNotEmpty() }
+    if (pluginFamily(pluginId)?.prefix == KOTLIN_PLUGIN_PREFIX) {
+      val rest = parts.drop(3).filter { it != "plugin" }
+      val tokens = if (rest.isEmpty()) listOf("kotlin") else listOf("kotlin") + rest
+      return sanitizeAlias(tokens.joinToString("-"))
+    }
     val slice = if (parts.size >= 2) parts.takeLast(2) else parts
     return sanitizeAlias(slice.joinToString("-"))
   }
@@ -266,6 +278,31 @@ internal class VersionCatalogEditor {
   }
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun choosePluginVersionAlias(lines: List<String>, pluginId: String, pluginAlias: String): String {
+    val family = pluginFamily(pluginId) ?: return pluginAlias
+    siblingVersionRef(lines, family)?.let { return it }
+    return family.versionAlias
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun siblingVersionRef(lines: List<String>, family: PluginFamily): String? {
+    for (range in sectionRanges(lines).filter { it.name == PLUGINS_SECTION }) {
+      for (index in range.first until range.last) {
+        val id = pluginIdOf(lines[index]) ?: continue
+        if (pluginFamily(id)?.prefix != family.prefix) continue
+        versionRefOf(lines[index])?.let { return it }
+      }
+    }
+    return null
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun hasVersion(lines: List<String>, alias: String): Boolean =
+    sectionRanges(lines)
+      .filter { it.name == VERSIONS_SECTION }
+      .any { range -> (range.first until range.last).any { keyOf(lines[it]) == alias } }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   private fun parsePlugins(catalog: String): Map<String, String> {
     val lines = catalog.lines()
     val result = linkedMapOf<String, String>()
@@ -308,6 +345,18 @@ internal class VersionCatalogEditor {
   private fun sanitizeAlias(value: String): String =
     value.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun pluginFamily(pluginId: String): PluginFamily? = when {
+    pluginId == KOTLIN_PLUGIN_PREFIX || pluginId.startsWith("$KOTLIN_PLUGIN_PREFIX.") ->
+      PluginFamily(prefix = KOTLIN_PLUGIN_PREFIX, versionAlias = "kotlin")
+    pluginId == ANDROID_PLUGIN_PREFIX || pluginId.startsWith("$ANDROID_PLUGIN_PREFIX.") ->
+      PluginFamily(prefix = ANDROID_PLUGIN_PREFIX, versionAlias = "agp")
+    else -> null
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private data class PluginFamily(val prefix: String, val versionAlias: String)
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private data class SectionRange(val name: String, val first: Int, val last: Int)
 
@@ -318,6 +367,8 @@ internal class VersionCatalogEditor {
     private const val VERSIONS_SECTION = "versions"
     private const val LIBRARIES_SECTION = "libraries"
     private const val PLUGINS_SECTION = "plugins"
+    private const val KOTLIN_PLUGIN_PREFIX = "org.jetbrains.kotlin"
+    private const val ANDROID_PLUGIN_PREFIX = "com.android"
     private val SECTION_HEADER = Regex("""^\[([^\]]+)]$""")
     private val PLUGIN_ID = Regex("""id\s*=\s*"([^"]+)"""")
     private val VERSION_REF = Regex("""version\.ref\s*=\s*"([^"]+)"""")

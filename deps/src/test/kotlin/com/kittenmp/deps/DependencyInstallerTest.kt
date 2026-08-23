@@ -240,10 +240,37 @@ class DependencyInstallerTest {
 
     assertEquals("added plugin kotlin-jvm 2.4.10 (org.jetbrains.kotlin.jvm)", summary)
     val catalog = File(root, "gradle/libs.versions.toml").readText()
-    assertTrue("""kotlin-jvm = "2.4.10"""" in catalog)
+    assertTrue("""kotlin = "2.4.10"""" in catalog)
     assertTrue(
-      """kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-jvm" }""" in catalog,
+      """kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }""" in catalog,
     )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `install kotlin compose plugin reuses the kotlin version`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        kotlin = "2.4.10"
+
+        [plugins]
+        kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root, docs = KOTLIN_COMPOSE_DOC).use {
+      it.install("org.jetbrains.kotlin.plugin.compose", plugin = true)
+    }
+
+    assertEquals("added plugin kotlin-compose 2.4.10 (org.jetbrains.kotlin.plugin.compose)", summary)
+    val catalog = File(root, "gradle/libs.versions.toml").readText()
+    assertTrue("""kotlin = "2.4.10"""" in catalog)
+    assertTrue(
+      """kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }""" in catalog,
+    )
+    assertEquals(false, "plugin-compose" in catalog)
+    assertEquals(1, Regex("""^kotlin = """, RegexOption.MULTILINE).findAll(catalog).count())
   }
 
   @Test
@@ -397,6 +424,8 @@ class DependencyInstallerTest {
       """{"g":"com.github.ajalt.clikt","a":"clikt","latestVersion":"5.1.0","timestamp":1}"""
     const val KOTLIN_JVM_DOC =
       """{"g":"org.jetbrains.kotlin.jvm","a":"org.jetbrains.kotlin.jvm.gradle.plugin","latestVersion":"2.4.10","timestamp":1}"""
+    const val KOTLIN_COMPOSE_DOC =
+      """{"g":"org.jetbrains.kotlin.plugin.compose","a":"org.jetbrains.kotlin.plugin.compose.gradle.plugin","latestVersion":"2.4.10","timestamp":1}"""
     val KTOR_TOML = """
       [libraries]
       server-auth = {group = "io.ktor", name = "ktor-server-auth", version.ref = "ktor" }

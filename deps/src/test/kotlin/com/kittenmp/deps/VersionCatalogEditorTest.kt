@@ -294,10 +294,10 @@ class VersionCatalogEditorTest {
     assertEquals(
       """
       [versions]
-      kotlin-jvm = "2.4.10"
+      kotlin = "2.4.10"
 
       [plugins]
-      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-jvm" }
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
       """.trimIndent() + "\n",
       result.content,
     )
@@ -328,6 +328,61 @@ class VersionCatalogEditorTest {
     assertEquals("kotlin-jvm", editor.choosePluginAlias(empty, KOTLIN_JVM))
     assertEquals("org-jetbrains-kotlin-jvm", editor.choosePluginAlias(taken, KOTLIN_JVM))
     assertEquals("kotlin-jvm", editor.choosePluginAlias(taken, PluginMatch("com.example.kotlin.jvm", "1.0")))
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `kotlin plugin aliases drop the jetbrains kotlin prefix`() {
+    assertEquals("kotlin-jvm", editor.pluginAliasFromId("org.jetbrains.kotlin.jvm"))
+    assertEquals("kotlin-compose", editor.pluginAliasFromId("org.jetbrains.kotlin.plugin.compose"))
+    assertEquals("kotlin-serialization", editor.pluginAliasFromId("org.jetbrains.kotlin.plugin.serialization"))
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `kotlin compose plugin reuses the kotlin version rather than minting its own`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+    val match = PluginMatch(id = "org.jetbrains.kotlin.plugin.compose", version = "2.4.10")
+
+    val result = editor.upsertPlugin(catalog, "kotlin-compose", match)
+
+    assertEquals(VersionCatalogEditor.Change.ADDED, result.change)
+    assertEquals(true, """kotlin = "2.4.10"""" in result.content)
+    assertEquals(
+      true,
+      """kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }""" in result.content,
+    )
+    assertEquals(false, """kotlin-compose = "2.4.10"""" in result.content)
+    assertEquals(false, "plugin-compose" in result.content)
+    assertEquals(1, Regex("""^kotlin = """, RegexOption.MULTILINE).findAll(result.content).count())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `a new kotlin plugin does not bump the existing kotlin version`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+    val match = PluginMatch(id = "org.jetbrains.kotlin.plugin.compose", version = "2.5.0")
+
+    val result = editor.upsertPlugin(catalog, "kotlin-compose", match)
+
+    assertEquals(true, """kotlin = "2.4.10"""" in result.content)
+    assertEquals(false, """kotlin = "2.5.0"""" in result.content)
+    assertEquals(
+      true,
+      """kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }""" in result.content,
+    )
   }
 
   @Test
