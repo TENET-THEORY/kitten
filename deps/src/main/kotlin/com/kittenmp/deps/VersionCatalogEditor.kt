@@ -56,6 +56,93 @@ internal class VersionCatalogEditor {
   }
 
   /**
+   * Points `[versions]` and `[plugins].alias` at [match], creating either section if the catalog
+   * does not have one yet. When the plugin already exists, its existing `version.ref` is reused.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun upsertPlugin(catalog: String, alias: String, match: PluginMatch): UpsertResult {
+    val newline = if (catalog.contains("\r\n")) "\r\n" else "\n"
+    val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
+    val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
+    val existing = pluginLine(lines, alias)
+    val versionAlias = existing?.let { versionRefOf(it) } ?: alias
+
+    val afterVersions = if (existing != null && versionRefOf(existing) == null) {
+      EntryUpsert(lines, Change.UNCHANGED)
+    } else {
+      upsertEntry(
+        lines = lines,
+        section = VERSIONS_SECTION,
+        alias = versionAlias,
+        entry = """$versionAlias = "${match.version}"""",
+      )
+    }
+
+    val pluginEntry = if (existing != null && versionRefOf(existing) == null) {
+      """$alias = { id = "${match.id}", version = "${match.version}" }"""
+    } else {
+      """$alias = { id = "${match.id}", version.ref = "$versionAlias" }"""
+    }
+    val plugins = upsertEntry(
+      lines = afterVersions.lines,
+      section = PLUGINS_SECTION,
+      alias = alias,
+      entry = pluginEntry,
+    )
+
+    val content = plugins.lines.joinToString(newline) + if (endsWithNewline) newline else ""
+    return UpsertResult(content, merge(afterVersions.change, plugins.change))
+  }
+
+  /** True when `[plugins]` already defines [alias]. */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun containsPlugin(catalog: String, alias: String): Boolean =
+    parsePlugins(catalog).keys.any { it.equals(alias, ignoreCase = true) }
+
+  /**
+   * Resolves [term] to a `[plugins]` alias. Accepts the alias itself or the plugin id stored in
+   * the catalog.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun resolvePluginAlias(catalog: String, term: String): String? {
+    val plugins = parsePlugins(catalog)
+    if (plugins.isEmpty()) return null
+    val trimmed = term.trim()
+    val sanitized = sanitizeAlias(trimmed)
+    plugins.keys.firstOrNull { it.equals(trimmed, ignoreCase = true) }?.let { return it }
+    plugins.keys.firstOrNull { it.equals(sanitized, ignoreCase = true) }?.let { return it }
+    plugins.entries.firstOrNull { it.value.equals(trimmed, ignoreCase = true) }?.let { return it.key }
+    return null
+  }
+
+  /** The plugin id stored under [alias], or null when that alias is missing. */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun pluginId(catalog: String, alias: String): String? =
+    parsePlugins(catalog).entries.firstOrNull { it.key.equals(alias, ignoreCase = true) }?.value
+
+  /**
+   * Picks a catalog alias for [match]: reuse an existing id mapping when there is one, otherwise
+   * the last two segments of the plugin id, falling back to the full id if that pretty alias is
+   * already taken by a different plugin.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun choosePluginAlias(catalog: String, match: PluginMatch): String {
+    resolvePluginAlias(catalog, match.id)?.let { return it }
+    val pretty = pluginAliasFromId(match.id)
+    val existingId = pluginId(catalog, pretty)
+    if (existingId == null || existingId == match.id) return pretty
+    return sanitizeAlias(match.id)
+  }
+
+  /** Last two dotted segments of a plugin id, as a catalog alias (`kotlin.jvm` → `kotlin-jvm`). */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun pluginAliasFromId(pluginId: String): String {
+    val parts = pluginId.split('.').filter { it.isNotEmpty() }
+    val slice = if (parts.size >= 2) parts.takeLast(2) else parts
+    return sanitizeAlias(slice.joinToString("-"))
+  }
+
+  /**
    * Drops `[versions].alias` and `[libraries].alias` when present. Other sections and unrelated
    * lines are left untouched.
    */
@@ -70,6 +157,33 @@ internal class VersionCatalogEditor {
 
     val content = libraries.lines.joinToString(newline) + if (endsWithNewline) newline else ""
     val change = if (versions.change == Change.REMOVED || libraries.change == Change.REMOVED) {
+      Change.REMOVED
+    } else {
+      Change.UNCHANGED
+    }
+    return UpsertResult(content, change)
+  }
+
+  /**
+   * Drops `[plugins].alias` when present. The matching `[versions]` entry is removed only when
+   * nothing else still references it.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun removePlugin(catalog: String, alias: String): UpsertResult {
+    val newline = if (catalog.contains("\r\n")) "\r\n" else "\n"
+    val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
+    val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
+    val versionAlias = pluginLine(lines, alias)?.let { versionRefOf(it) }
+
+    val plugins = removeEntry(lines, PLUGINS_SECTION, alias)
+    val versions = if (versionAlias != null && !isVersionRefUsed(plugins.lines, versionAlias)) {
+      removeEntry(plugins.lines, VERSIONS_SECTION, versionAlias)
+    } else {
+      EntryUpsert(plugins.lines, Change.UNCHANGED)
+    }
+
+    val content = versions.lines.joinToString(newline) + if (endsWithNewline) newline else ""
+    val change = if (plugins.change == Change.REMOVED || versions.change == Change.REMOVED) {
       Change.REMOVED
     } else {
       Change.UNCHANGED
@@ -151,6 +265,49 @@ internal class VersionCatalogEditor {
     else -> Change.UNCHANGED
   }
 
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun parsePlugins(catalog: String): Map<String, String> {
+    val lines = catalog.lines()
+    val result = linkedMapOf<String, String>()
+    for (range in sectionRanges(lines).filter { it.name == PLUGINS_SECTION }) {
+      for (index in range.first until range.last) {
+        val alias = keyOf(lines[index]) ?: continue
+        val id = pluginIdOf(lines[index]) ?: continue
+        result[alias] = id
+      }
+    }
+    return result
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun pluginLine(lines: List<String>, alias: String): String? {
+    for (range in sectionRanges(lines).filter { it.name == PLUGINS_SECTION }) {
+      val index = (range.first until range.last).firstOrNull { keyOf(lines[it]) == alias } ?: continue
+      return lines[index]
+    }
+    return null
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun pluginIdOf(line: String): String? = PLUGIN_ID.find(line)?.groupValues?.get(1)
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun versionRefOf(line: String): String? = VERSION_REF.find(line)?.groupValues?.get(1)
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun isVersionRefUsed(lines: List<String>, versionAlias: String): Boolean {
+    val sections = setOf(LIBRARIES_SECTION, PLUGINS_SECTION)
+    return sectionRanges(lines)
+      .filter { it.name in sections }
+      .any { range ->
+        (range.first until range.last).any { versionRefOf(lines[it]) == versionAlias }
+      }
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun sanitizeAlias(value: String): String =
+    value.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private data class SectionRange(val name: String, val first: Int, val last: Int)
 
@@ -160,6 +317,9 @@ internal class VersionCatalogEditor {
   companion object {
     private const val VERSIONS_SECTION = "versions"
     private const val LIBRARIES_SECTION = "libraries"
+    private const val PLUGINS_SECTION = "plugins"
     private val SECTION_HEADER = Regex("""^\[([^\]]+)]$""")
+    private val PLUGIN_ID = Regex("""id\s*=\s*"([^"]+)"""")
+    private val VERSION_REF = Regex("""version\.ref\s*=\s*"([^"]+)"""")
   }
 }

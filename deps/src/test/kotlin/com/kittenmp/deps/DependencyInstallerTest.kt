@@ -229,6 +229,124 @@ class DependencyInstallerTest {
     assertTrue("implementation(libs.clikt)" in File(root, "app/build.gradle.kts").readText())
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `install plugin writes the catalog plugins section`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+
+    val summary = installerFor(root, docs = KOTLIN_JVM_DOC).use {
+      it.install("org.jetbrains.kotlin.jvm", plugin = true)
+    }
+
+    assertEquals("added plugin kotlin-jvm 2.4.10 (org.jetbrains.kotlin.jvm)", summary)
+    val catalog = File(root, "gradle/libs.versions.toml").readText()
+    assertTrue("""kotlin-jvm = "2.4.10"""" in catalog)
+    assertTrue(
+      """kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-jvm" }""" in catalog,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `install plugin with module wires the plugins block`() {
+    val root = tempProject(
+      catalog = "[versions]\n\n[libraries]\n",
+      moduleBuild = "dependencies {\n}\n",
+    )
+
+    val summary = installerFor(root, docs = KOTLIN_JVM_DOC).use {
+      it.install("org.jetbrains.kotlin.jvm", module = "app", plugin = true)
+    }
+
+    assertTrue("added plugin kotlin-jvm 2.4.10" in summary, summary)
+    assertTrue("added alias(libs.plugins.kotlin.jvm) to app/build.gradle.kts" in summary, summary)
+    assertTrue("alias(libs.plugins.kotlin.jvm)" in File(root, "app/build.gradle.kts").readText())
+    assertEquals(false, File(root, "build.gradle.kts").exists())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `adding a plugin to a second module declares it apply false on the root`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        kotlin-jvm = "2.4.10"
+
+        [plugins]
+        kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-jvm" }
+      """.trimIndent() + "\n",
+      moduleBuild = """
+        plugins {
+        }
+      """.trimIndent() + "\n",
+    )
+    File(root, "lib").mkdirs()
+    File(root, "lib/build.gradle.kts").writeText("plugins {\n}\n")
+
+    installerFor(root, docs = KOTLIN_JVM_DOC).use { it.addToModule("app", "kotlin-jvm", plugin = true) }
+    val summary = installerFor(root, docs = KOTLIN_JVM_DOC).use {
+      it.addToModule("lib", "kotlin-jvm", plugin = true)
+    }
+
+    assertTrue("added alias(libs.plugins.kotlin.jvm) to lib/build.gradle.kts" in summary, summary)
+    assertTrue("added alias(libs.plugins.kotlin.jvm) apply false to build.gradle.kts" in summary, summary)
+    assertEquals(
+      """
+      plugins {
+        alias(libs.plugins.kotlin.jvm) apply false
+      }
+      """.trimIndent(),
+      File(root, "build.gradle.kts").readText().trim(),
+    )
+    assertTrue("alias(libs.plugins.kotlin.jvm)" in File(root, "app/build.gradle.kts").readText())
+    assertTrue("alias(libs.plugins.kotlin.jvm)" in File(root, "lib/build.gradle.kts").readText())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `add plugin resolves ktorLibs plugins`() {
+    val root = tempProject(
+      catalog = "[versions]\n\n[libraries]\n\n[plugins]\n",
+      moduleBuild = "plugins {\n}\n",
+      settings = """
+        versionCatalogs {
+          create("ktorLibs") { from("io.ktor:ktor-version-catalog:3.5.2") }
+        }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root, ktorToml = KTOR_TOML).use {
+      it.addToModule("app", "ktor", plugin = true)
+    }
+
+    assertEquals("added alias(ktorLibs.plugins.ktor) to app/build.gradle.kts", summary)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `uninstall plugin removes catalog plugin entries`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+    installerFor(root, docs = KOTLIN_JVM_DOC).use { it.install("org.jetbrains.kotlin.jvm", plugin = true) }
+
+    val summary = installerFor(root, docs = KOTLIN_JVM_DOC).use {
+      it.uninstall("org.jetbrains.kotlin.jvm", plugin = true)
+    }
+
+    assertEquals("removed plugin kotlin-jvm", summary)
+    val catalog = File(root, "gradle/libs.versions.toml").readText()
+    assertEquals(false, "kotlin-jvm" in catalog)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `uninstall of a missing plugin is an error`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+    val failure = assertFailsWith<IllegalStateException> {
+      installerFor(root).use { it.uninstall("kotlin-jvm", plugin = true) }
+    }
+    assertTrue("kotlin-jvm" in failure.message.orEmpty())
+  }
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun tempProject(
     catalog: String,
@@ -277,10 +395,15 @@ class DependencyInstallerTest {
   private companion object {
     const val CLIKT_DOC =
       """{"g":"com.github.ajalt.clikt","a":"clikt","latestVersion":"5.1.0","timestamp":1}"""
+    const val KOTLIN_JVM_DOC =
+      """{"g":"org.jetbrains.kotlin.jvm","a":"org.jetbrains.kotlin.jvm.gradle.plugin","latestVersion":"2.4.10","timestamp":1}"""
     val KTOR_TOML = """
       [libraries]
       server-auth = {group = "io.ktor", name = "ktor-server-auth", version.ref = "ktor" }
       server-htmlBuilder = {group = "io.ktor", name = "ktor-server-html-builder", version.ref = "ktor" }
+
+      [plugins]
+      ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
     """.trimIndent()
   }
 }

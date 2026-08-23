@@ -162,4 +162,117 @@ class BuildGradleEditorTest {
 
     assertEquals(BuildGradleEditor.Change.UNCHANGED, result.change)
   }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `inserts a plugin alias into an empty plugins block`() {
+    val script = """
+      plugins {
+      }
+
+      dependencies {
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addPlugin(script, "kotlin-jvm")
+
+    assertEquals(BuildGradleEditor.Change.ADDED, result.change)
+    assertEquals(
+      """
+      plugins {
+        alias(libs.plugins.kotlin.jvm)
+      }
+
+      dependencies {
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `plugin aliases are idempotent including apply false`() {
+    val script = """
+      plugins {
+        alias(libs.plugins.kotlin.jvm) apply false
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addPlugin(script, "kotlin-jvm", applyFalse = true)
+
+    assertEquals(BuildGradleEditor.Change.UNCHANGED, result.change)
+    assertEquals(script, result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `does not convert an applied plugin into apply false`() {
+    val script = """
+      plugins {
+        alias(libs.plugins.kotlin.jvm)
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addPlugin(script, "kotlin-jvm", applyFalse = true)
+
+    assertEquals(BuildGradleEditor.Change.UNCHANGED, result.change)
+    assertEquals(script, result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates a plugins block at the top when missing`() {
+    val script = """
+      dependencies {
+        implementation(libs.clikt)
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addPlugin(script, "kotlin-jvm")
+
+    assertEquals(
+      """
+      plugins {
+        alias(libs.plugins.kotlin.jvm)
+      }
+
+      dependencies {
+        implementation(libs.clikt)
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `writes apply false on the plugin declaration`() {
+    val script = "plugins {\n}\n"
+
+    val result = editor.addPlugin(script, "kotlin-jvm", applyFalse = true)
+
+    assertEquals(true, "alias(libs.plugins.kotlin.jvm) apply false" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `hasPlugin matches applied and apply false declarations`() {
+    assertEquals(true, editor.hasPlugin("alias(libs.plugins.kotlin.jvm)\n", "kotlin-jvm"))
+    assertEquals(
+      true,
+      editor.hasPlugin("alias(libs.plugins.kotlin.jvm) apply false\n", "kotlin-jvm"),
+    )
+    assertEquals(false, editor.hasPlugin("alias(libs.plugins.ktfmt.gradle)\n", "kotlin-jvm"))
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `uses a custom catalog for plugins`() {
+    val script = "plugins {\n}\n"
+
+    val result = editor.addPlugin(script, "ktor", catalogExtension = "ktorLibs")
+
+    assertEquals(true, "alias(ktorLibs.plugins.ktor)" in result.content)
+  }
 }

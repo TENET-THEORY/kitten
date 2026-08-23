@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.convert
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.kittenmp.ai.ComprehensionDebt
 import com.kittenmp.ai.HumansOnly
@@ -25,11 +26,12 @@ class Install : CliktCommand() {
 
   val artifactId by argument()
   val module by option("--module")
+  val plugin by option("--plugin", help = "Treat the argument as a Gradle plugin id").flag()
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.install(artifactId, module) })
+      echo(DependencyInstaller().use { it.install(artifactId, module, plugin) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to install dependency")
     }
@@ -45,11 +47,12 @@ class Add : CliktCommand() {
 
   val module by argument()
   val artifactId by argument()
+  val plugin by option("--plugin", help = "Wire a Gradle plugin instead of a library").flag()
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.addToModule(module, artifactId) })
+      echo(DependencyInstaller().use { it.addToModule(module, artifactId, plugin) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to add dependency to module")
     }
@@ -60,11 +63,12 @@ class Add : CliktCommand() {
 class Uninstall : CliktCommand() {
 
   val artifactId by argument()
+  val plugin by option("--plugin", help = "Remove a Gradle plugin instead of a library").flag()
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.uninstall(artifactId) })
+      echo(DependencyInstaller().use { it.uninstall(artifactId, plugin) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to uninstall dependency")
     }

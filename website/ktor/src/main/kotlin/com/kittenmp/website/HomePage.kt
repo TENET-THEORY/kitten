@@ -198,36 +198,39 @@ private fun FlowContent.commands() {
     )
     commandBlock(
       name = "install",
-      summary = "Add a Maven Central library to the catalog",
+      summary = "Add a Maven Central library or Gradle plugin to the catalog",
       detail =
-        "Looks up the latest release and writes it into the nearest libs.versions.toml. Prefer group:artifactId when several groups publish the same name. With --module, also adds implementation(libs…) to that module’s build script.",
+        "Looks up the latest release and writes it into the nearest libs.versions.toml. Prefer group:artifactId when several groups publish the same name. With --module, also adds implementation(libs…) to that module’s build script. Pass --plugin for a Gradle plugin id (writes alias(libs.plugins…) when --module is set).",
       examples =
         listOf(
           "kitten install clikt",
           "kitten install com.github.ajalt.clikt:clikt",
           "kitten install clikt --module app",
+          "kitten install org.jetbrains.kotlin.jvm --plugin --module app",
         ),
     )
     commandBlock(
       name = "add",
-      summary = "Wire an existing catalog library into a module",
+      summary = "Wire an existing catalog library or plugin into a module",
       detail =
-        "Does not fetch from Maven Central. Resolves from the local libs.versions.toml, or from the project’s published ktorLibs catalog when present.",
+        "Does not fetch from Maven Central. Resolves from the local libs.versions.toml, or from the project’s published ktorLibs catalog when present. Pass --plugin to wire alias(…plugins…). If that plugin is then used in more than one module, it is also declared on the root build script with apply false.",
       examples =
         listOf(
           "kitten add app clikt",
           "kitten add :ktor server-core",
+          "kitten add lib kotlin-jvm --plugin",
         ),
     )
     commandBlock(
       name = "uninstall",
-      summary = "Remove a library from the catalog",
+      summary = "Remove a library or plugin from the catalog",
       detail =
-        "Removes the matching alias from libs.versions.toml. Does not edit module build scripts.",
+        "Removes the matching alias from libs.versions.toml. Does not edit module build scripts. Pass --plugin to remove a [plugins] entry.",
       examples =
         listOf(
           "kitten uninstall clikt",
           "kitten uninstall com.github.ajalt.clikt:clikt",
+          "kitten uninstall kotlin-jvm --plugin",
         ),
     )
   }
@@ -321,7 +324,13 @@ private fun FlowContent.notes() {
       span(classes = "inline-code") { +":feature:auth" }
       +" → "
       span(classes = "inline-code") { +"feature/auth" }
-      +")."
+      +"). Pass "
+      span(classes = "inline-code") { +"--plugin" }
+      +" on install / add / uninstall to work with Gradle plugins instead of libraries. When a plugin is applied in more than one module, Kitten declares it on the root "
+      span(classes = "inline-code") { +"build.gradle.kts" }
+      +" with "
+      span(classes = "inline-code") { +"apply false" }
+      +"."
     }
     h3 { +"Ktor version catalog" }
     p {
@@ -348,7 +357,11 @@ private fun FlowContent.notes() {
       span(classes = "inline-code") { +"ktor-server-core" }
       +"), or coordinates ("
       span(classes = "inline-code") { +"io.ktor:ktor-server-core" }
-      +")."
+      +"). With "
+      span(classes = "inline-code") { +"--plugin" }
+      +", the same lookup writes "
+      span(classes = "inline-code") { +"alias(ktorLibs.plugins…)" }
+      +"."
     }
     h3 { +"AI-generated content" }
     p {
