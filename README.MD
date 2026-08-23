@@ -2,7 +2,15 @@
 
 CLI for scaffolding Kotlin projects and managing Gradle version-catalog dependencies.
 
-## Run
+## Install
+
+```bash
+brew install tenet-theory/tap/kitten
+```
+
+Requires Java 21, which the formula pulls in via `openjdk@21`. See [releases](https://github.com/TENET-THEORY/kitten/releases) for the raw distribution tarball if you'd rather skip Homebrew.
+
+## Build from source
 
 ```bash
 ./gradlew :app:run --args='<command> ...'
