@@ -262,6 +262,11 @@ private fun FlowContent.roadmap() {
         detail =
           "Add a Gradle module to an existing project — directory, build.gradle.kts, and settings.gradle.kts include — instead of wiring that by hand.",
       )
+      roadmapCard(
+        title = "Kotlin toolchain support",
+        detail =
+          "kitten new and the dependency commands currently assume a Gradle project. Support the plain Kotlin toolchain (kotlinc / kotlin CLI, no build tool) as a project type alongside Gradle-based ones, so both are first-class.",
+      )
     }
     h3 { +"Phoenix-like scaffolding" }
     p {

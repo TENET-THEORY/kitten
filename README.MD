@@ -80,6 +80,8 @@ Not built yet. Next up is richer project init and creating modules, then Phoenix
 
 **Creating modules.** Add a Gradle module to an existing project — directory, `build.gradle.kts`, and `settings.gradle.kts` include — instead of wiring that by hand.
 
+**Kotlin toolchain support.** `kitten new` and the dependency commands currently assume a Gradle project. Support the plain Kotlin toolchain (`kotlinc`/`kotlin` CLI, no build tool) as a project type alongside Gradle-based ones, so both are first-class.
+
 ### Phoenix-like scaffolding
 
 Inspired by Phoenix generators: one command writes the boring layers, consistently, across the stack.
