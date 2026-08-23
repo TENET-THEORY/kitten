@@ -52,6 +52,7 @@ kitten install org.jetbrains.kotlin.jvm --plugin --module app
 - Prefer `group:artifactId` when several groups publish the same name; otherwise Kitten picks the newest and lists alternatives.
 - With `--module`, also adds `implementation(libs…)` to that module’s `build.gradle(.kts)`, or `alias(libs.plugins…)` when `--plugin` is set.
 - Kotlin Gradle plugins (`org.jetbrains.kotlin.*`) share `[versions].kotlin` when it already exists, and use `kotlin-*` aliases (`org.jetbrains.kotlin.plugin.compose` → `kotlin-compose`). Other plugins use the last two segments of the id.
+- Compose UI libraries (`androidx.compose.ui` / `org.jetbrains.compose.ui`) share `[versions].compose-ui` instead of a version key per artifact.
 
 ### `add` — wire an existing catalog library or plugin into a module
 

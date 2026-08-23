@@ -231,6 +231,31 @@ class DependencyInstallerTest {
 
   @Test
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `install compose ui libraries share the compose-ui version`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+
+    installerFor(root, docs = COMPOSE_UI_DOCS).use { it.install("androidx.compose.ui:ui") }
+    val summary = installerFor(root, docs = COMPOSE_UI_DOCS).use {
+      it.install("androidx.compose.ui:ui-tooling")
+    }
+
+    assertEquals("added ui-tooling 1.7.5 (androidx.compose.ui:ui-tooling)", summary)
+    val catalog = File(root, "gradle/libs.versions.toml").readText()
+    assertEquals(true, """compose-ui = "1.7.5"""" in catalog)
+    assertEquals(
+      true,
+      """ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose-ui" }""" in catalog,
+    )
+    assertEquals(
+      true,
+      """ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "compose-ui" }""" in catalog,
+    )
+    assertEquals(false, Regex("""^ui-tooling = """", RegexOption.MULTILINE).containsMatchIn(catalog))
+    assertEquals(1, Regex("""^compose-ui = """, RegexOption.MULTILINE).findAll(catalog).count())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun `install plugin writes the catalog plugins section`() {
     val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
 
@@ -426,6 +451,10 @@ class DependencyInstallerTest {
       """{"g":"org.jetbrains.kotlin.jvm","a":"org.jetbrains.kotlin.jvm.gradle.plugin","latestVersion":"2.4.10","timestamp":1}"""
     const val KOTLIN_COMPOSE_DOC =
       """{"g":"org.jetbrains.kotlin.plugin.compose","a":"org.jetbrains.kotlin.plugin.compose.gradle.plugin","latestVersion":"2.4.10","timestamp":1}"""
+    val COMPOSE_UI_DOCS = """
+      {"g":"androidx.compose.ui","a":"ui","latestVersion":"1.7.5","timestamp":1},
+      {"g":"androidx.compose.ui","a":"ui-tooling","latestVersion":"1.7.5","timestamp":1}
+    """.trimIndent()
     val KTOR_TOML = """
       [libraries]
       server-auth = {group = "io.ktor", name = "ktor-server-auth", version.ref = "ktor" }

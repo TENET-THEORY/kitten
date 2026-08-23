@@ -20,30 +20,46 @@ internal class VersionCatalogEditor {
   }
 
   /**
-   * Points `[versions].alias` and `[libraries].alias` at [match], creating either section if the
-   * catalog does not have one yet.
+   * Points `[versions]` and `[libraries].alias` at [match], creating either section if the catalog
+   * does not have one yet. When the library already exists, its existing `version.ref` is reused.
+   * Compose UI artifacts share `[versions].compose-ui` (or a sibling's ref) instead of minting a
+   * per-artifact version.
    */
-  @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun upsert(catalog: String, alias: String, match: ArtifactMatch): UpsertResult {
     val newline = if (catalog.contains("\r\n")) "\r\n" else "\n"
     val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
     val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
+    val existing = libraryLine(lines, alias)
+    val versionAlias = existing?.let { versionRefOf(it) }
+      ?: chooseLibraryVersionAlias(lines, match, alias)
 
-    val versions = upsertEntry(
-      lines = lines,
-      section = VERSIONS_SECTION,
-      alias = alias,
-      entry = """$alias = "${match.version}"""",
-    )
+    val afterVersions = when {
+      existing != null && versionRefOf(existing) == null -> EntryUpsert(lines, Change.UNCHANGED)
+      existing == null && versionAlias != alias && hasVersion(lines, versionAlias) ->
+        EntryUpsert(lines, Change.UNCHANGED)
+      else -> upsertEntry(
+        lines = lines,
+        section = VERSIONS_SECTION,
+        alias = versionAlias,
+        entry = """$versionAlias = "${match.version}"""",
+      )
+    }
+
+    val libraryEntry = if (existing != null && versionRefOf(existing) == null) {
+      """$alias = { group = "${match.group}", name = "${match.name}", version = "${match.version}" }"""
+    } else {
+      """$alias = { group = "${match.group}", name = "${match.name}", version.ref = "$versionAlias" }"""
+    }
     val libraries = upsertEntry(
-      lines = versions.lines,
+      lines = afterVersions.lines,
       section = LIBRARIES_SECTION,
       alias = alias,
-      entry = """$alias = { group = "${match.group}", name = "${match.name}", version.ref = "$alias" }""",
+      entry = libraryEntry,
     )
 
     val content = libraries.lines.joinToString(newline) + if (endsWithNewline) newline else ""
-    return UpsertResult(content, merge(versions.change, libraries.change))
+    return UpsertResult(content, merge(afterVersions.change, libraries.change))
   }
 
   /** True when `[libraries]` already defines [alias]. */
@@ -155,20 +171,25 @@ internal class VersionCatalogEditor {
   }
 
   /**
-   * Drops `[versions].alias` and `[libraries].alias` when present. Other sections and unrelated
-   * lines are left untouched.
+   * Drops `[libraries].alias` when present. The matching `[versions]` entry is removed only when
+   * nothing else still references it.
    */
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun remove(catalog: String, alias: String): UpsertResult {
     val newline = if (catalog.contains("\r\n")) "\r\n" else "\n"
     val endsWithNewline = catalog.isEmpty() || catalog.endsWith("\n")
     val lines = catalog.removeSuffix(newline).let { if (it.isEmpty()) emptyList() else it.lines() }
+    val versionAlias = libraryLine(lines, alias)?.let { versionRefOf(it) } ?: alias
 
-    val versions = removeEntry(lines, VERSIONS_SECTION, alias)
-    val libraries = removeEntry(versions.lines, LIBRARIES_SECTION, alias)
+    val libraries = removeEntry(lines, LIBRARIES_SECTION, alias)
+    val versions = if (!isVersionRefUsed(libraries.lines, versionAlias)) {
+      removeEntry(libraries.lines, VERSIONS_SECTION, versionAlias)
+    } else {
+      EntryUpsert(libraries.lines, Change.UNCHANGED)
+    }
 
-    val content = libraries.lines.joinToString(newline) + if (endsWithNewline) newline else ""
-    val change = if (versions.change == Change.REMOVED || libraries.change == Change.REMOVED) {
+    val content = versions.lines.joinToString(newline) + if (endsWithNewline) newline else ""
+    val change = if (libraries.change == Change.REMOVED || versions.change == Change.REMOVED) {
       Change.REMOVED
     } else {
       Change.UNCHANGED
@@ -278,6 +299,46 @@ internal class VersionCatalogEditor {
   }
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun chooseLibraryVersionAlias(
+    lines: List<String>,
+    match: ArtifactMatch,
+    alias: String,
+  ): String {
+    if (!isComposeUiGroup(match.group)) return alias
+    siblingComposeUiVersionRef(lines)?.let { return it }
+    return COMPOSE_UI_VERSION_ALIAS
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun siblingComposeUiVersionRef(lines: List<String>): String? {
+    for (range in sectionRanges(lines).filter { it.name == LIBRARIES_SECTION }) {
+      for (index in range.first until range.last) {
+        val group = groupOf(lines[index]) ?: continue
+        if (!isComposeUiGroup(group)) continue
+        versionRefOf(lines[index])?.let { return it }
+      }
+    }
+    return null
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun libraryLine(lines: List<String>, alias: String): String? {
+    for (range in sectionRanges(lines).filter { it.name == LIBRARIES_SECTION }) {
+      val index = (range.first until range.last).firstOrNull { keyOf(lines[it]) == alias } ?: continue
+      return lines[index]
+    }
+    return null
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun groupOf(line: String): String? {
+    GROUP_VALUE.find(line)?.groupValues?.get(1)?.let { return it }
+    val module = MODULE_VALUE.find(line)?.groupValues?.get(1) ?: return null
+    val group = module.substringBefore(':', missingDelimiterValue = "")
+    return group.ifEmpty { null }
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   private fun choosePluginVersionAlias(lines: List<String>, pluginId: String, pluginAlias: String): String {
     val family = pluginFamily(pluginId) ?: return pluginAlias
     siblingVersionRef(lines, family)?.let { return it }
@@ -372,5 +433,11 @@ internal class VersionCatalogEditor {
     private val SECTION_HEADER = Regex("""^\[([^\]]+)]$""")
     private val PLUGIN_ID = Regex("""id\s*=\s*"([^"]+)"""")
     private val VERSION_REF = Regex("""version\.ref\s*=\s*"([^"]+)"""")
+    private val GROUP_VALUE = Regex("""group\s*=\s*"([^"]+)"""")
+    private val MODULE_VALUE = Regex("""module\s*=\s*"([^"]+)"""")
+    private const val COMPOSE_UI_VERSION_ALIAS = "compose-ui"
+
+    @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+    private fun isComposeUiGroup(group: String): Boolean = group.endsWith(".compose.ui")
   }
 }

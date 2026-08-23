@@ -387,6 +387,102 @@ class VersionCatalogEditorTest {
 
   @Test
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `compose ui libraries share a compose-ui version rather than minting their own`() {
+    val catalog = editor.upsert(EMPTY_CATALOG, "ui", COMPOSE_UI).content
+    val result = editor.upsert(catalog, "ui-tooling", COMPOSE_UI_TOOLING)
+
+    assertEquals(VersionCatalogEditor.Change.ADDED, result.change)
+    assertEquals(true, """compose-ui = "1.7.5"""" in result.content)
+    assertEquals(
+      true,
+      """ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose-ui" }""" in result.content,
+    )
+    assertEquals(
+      true,
+      """ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "compose-ui" }""" in result.content,
+    )
+    assertEquals(false, Regex("""^ui = """", RegexOption.MULTILINE).containsMatchIn(result.content))
+    assertEquals(false, Regex("""^ui-tooling = """", RegexOption.MULTILINE).containsMatchIn(result.content))
+    assertEquals(1, Regex("""^compose-ui = """, RegexOption.MULTILINE).findAll(result.content).count())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `a new compose ui library reuses an existing sibling version ref`() {
+    val catalog = """
+      [versions]
+      compose-ui = "1.7.0"
+
+      [libraries]
+      ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose-ui" }
+    """.trimIndent() + "\n"
+
+    val result = editor.upsert(catalog, "ui-tooling", COMPOSE_UI_TOOLING.copy(version = "1.8.0"))
+
+    assertEquals(true, """compose-ui = "1.7.0"""" in result.content)
+    assertEquals(false, """compose-ui = "1.8.0"""" in result.content)
+    assertEquals(
+      true,
+      """ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "compose-ui" }""" in result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `compose ui libraries reuse a sibling's version ref even when it is not named compose-ui`() {
+    val catalog = """
+      [versions]
+      ui = "1.7.0"
+
+      [libraries]
+      ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
+    """.trimIndent() + "\n"
+
+    val result = editor.upsert(catalog, "ui-tooling", COMPOSE_UI_TOOLING)
+
+    assertEquals(true, """ui = "1.7.0"""" in result.content)
+    assertEquals(false, """compose-ui = """ in result.content)
+    assertEquals(
+      true,
+      """ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "ui" }""" in result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `jetbrains compose ui uses the same compose-ui version ref`() {
+    val catalog = editor.upsert(EMPTY_CATALOG, "ui", COMPOSE_UI).content
+    val jetbrains = ArtifactMatch(
+      group = "org.jetbrains.compose.ui",
+      name = "ui-tooling-preview",
+      version = "1.8.0",
+    )
+
+    val result = editor.upsert(catalog, "ui-tooling-preview", jetbrains)
+
+    assertEquals(
+      true,
+      """ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "compose-ui" }""" in result.content,
+    )
+    assertEquals(false, """ui-tooling-preview = "1.8.0"""" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `remove keeps a shared compose-ui version while siblings remain`() {
+    val catalog = editor.upsert(EMPTY_CATALOG, "ui", COMPOSE_UI).content
+    val withBoth = editor.upsert(catalog, "ui-tooling", COMPOSE_UI_TOOLING).content
+
+    val result = editor.remove(withBoth, "ui-tooling")
+
+    assertEquals(VersionCatalogEditor.Change.REMOVED, result.change)
+    assertEquals(true, """compose-ui = "1.7.5"""" in result.content)
+    assertEquals(true, """ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose-ui" }""" in result.content)
+    assertEquals(false, "ui-tooling" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun `removePlugin drops an unused version but keeps shared ones`() {
     val catalog = """
       [versions]
@@ -413,5 +509,11 @@ class VersionCatalogEditorTest {
   private companion object {
     const val EMPTY_CATALOG = "[versions]\n\n[libraries]\n"
     val KOTLIN_JVM = PluginMatch(id = "org.jetbrains.kotlin.jvm", version = "2.4.10")
+    val COMPOSE_UI = ArtifactMatch(group = "androidx.compose.ui", name = "ui", version = "1.7.5")
+    val COMPOSE_UI_TOOLING = ArtifactMatch(
+      group = "androidx.compose.ui",
+      name = "ui-tooling",
+      version = "1.7.5",
+    )
   }
 }
