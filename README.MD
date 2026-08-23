@@ -1,6 +1,6 @@
 # Kitten
 
-CLI for scaffolding Kotlin projects and managing Gradle version-catalog dependencies.
+CLI for scaffolding Kotlin projects and managing Gradle version-catalog dependencies and plugins.
 
 ## Install
 
@@ -37,35 +37,44 @@ kitten new api --package com.example.api --type ktor
 
 `--type` accepts `plain` / `kotlin` or `ktor`.
 
-### `install` — add a Maven Central library to the catalog
+### `install` — add a Maven Central library or Gradle plugin to the catalog
 
-Looks up the latest release on Maven Central and writes it into the nearest `gradle/libs.versions.toml` (walking up from the current directory).
+Looks up the latest release on Maven Central and writes it into the nearest `gradle/libs.versions.toml` (walking up from the current directory). Pass `--plugin` to treat the argument as a Gradle plugin id (Plugin Portal is used when Central has no marker artifact).
 
 ```bash
 kitten install clikt
 kitten install com.github.ajalt.clikt:clikt
 kitten install clikt --module app
+kitten install org.jetbrains.kotlin.jvm --plugin
+kitten install org.jetbrains.kotlin.jvm --plugin --module app
 ```
 
 - Prefer `group:artifactId` when several groups publish the same name; otherwise Kitten picks the newest and lists alternatives.
-- With `--module`, also adds `implementation(libs…)` to that module’s `build.gradle(.kts)`.
+- With `--module`, also adds `implementation(libs…)` to that module’s `build.gradle(.kts)`, or `alias(libs.plugins…)` when `--plugin` is set.
+- Plugin aliases use the last two segments of the id (`org.jetbrains.kotlin.jvm` → `kotlin-jvm`).
 
-### `add` — wire an existing catalog library into a module
+### `add` — wire an existing catalog library or plugin into a module
 
-Does not fetch from Maven Central. Resolves the library from the local `libs.versions.toml`, or from the project’s published `ktorLibs` catalog when present.
+Does not fetch from Maven Central. Resolves the library from the local `libs.versions.toml`, or from the project’s published `ktorLibs` catalog when present. Pass `--plugin` to wire `alias(…plugins…)` instead of `implementation`.
 
 ```bash
 kitten add app clikt
 kitten add :ktor server-core
+kitten add app kotlin-jvm --plugin
+kitten add lib org.jetbrains.kotlin.jvm --plugin
 ```
 
-### `uninstall` — remove a library from the catalog
+When a plugin is applied in more than one module, Kitten also declares it on the root `build.gradle.kts` with `apply false` (creating that file if needed).
 
-Removes the matching alias from `gradle/libs.versions.toml`. Does not edit module build scripts.
+### `uninstall` — remove a library or plugin from the catalog
+
+Removes the matching alias from `gradle/libs.versions.toml`. Does not edit module build scripts. Pass `--plugin` to remove a `[plugins]` entry (a shared `[versions]` entry is left in place if something else still references it).
 
 ```bash
 kitten uninstall clikt
 kitten uninstall com.github.ajalt.clikt:clikt
+kitten uninstall kotlin-jvm --plugin
+kitten uninstall org.jetbrains.kotlin.jvm --plugin
 ```
 
 ## Roadmap
@@ -104,7 +113,7 @@ versionCatalogs {
 }
 ```
 
-`kitten add` resolves against that catalog when the library isn’t in the local `libs.versions.toml`, and writes `implementation(ktorLibs…)` into the module build script. Local catalog entries always win. You can pass aliases (`server-core`), artifact ids (`ktor-server-core`), or coordinates (`io.ktor:ktor-server-core`).
+`kitten add` resolves against that catalog when the library isn’t in the local `libs.versions.toml`, and writes `implementation(ktorLibs…)` into the module build script. Local catalog entries always win. You can pass aliases (`server-core`), artifact ids (`ktor-server-core`), or coordinates (`io.ktor:ktor-server-core`). The same lookup applies to plugins with `--plugin` (`kitten add ktor ktor --plugin` → `alias(ktorLibs.plugins.ktor)`).
 
 ### AI-generated content
 

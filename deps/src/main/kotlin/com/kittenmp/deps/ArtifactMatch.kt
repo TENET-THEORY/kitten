@@ -32,3 +32,11 @@ internal data class ArtifactQuery(val group: String?, val name: String) {
     }
   }
 }
+
+/** A resolved Gradle plugin id and its newest published version. */
+@ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+internal data class PluginMatch(
+  val id: String,
+  val version: String,
+  val alternatives: List<String> = emptyList(),
+)

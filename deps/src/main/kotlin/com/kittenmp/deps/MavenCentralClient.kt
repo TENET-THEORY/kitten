@@ -23,6 +23,7 @@ import java.io.IOException
 @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
 internal class MavenCentralClient(
   private val searchUrl: String = CENTRAL_SEARCH_URL,
+  private val pluginPortalM2Url: String = PLUGIN_PORTAL_M2_URL,
   private val client: HttpClient = defaultHttpClient(),
 ) : AutoCloseable {
 
@@ -77,9 +78,12 @@ internal class MavenCentralClient(
    * reliably.
    */
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
-  private suspend fun search(artifactName: String): List<SearchDoc> {
+  private suspend fun search(artifactName: String): List<SearchDoc> = searchQuery("a:$artifactName")
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private suspend fun searchQuery(q: String): List<SearchDoc> {
     val response = client.get(searchUrl) {
-      url.parameters.append("q", "a:$artifactName")
+      url.parameters.append("q", q)
       url.parameters.append("rows", "$SEARCH_ROWS")
       url.parameters.append("wt", "json")
     }
@@ -87,6 +91,82 @@ internal class MavenCentralClient(
       error("Maven Central search failed with HTTP ${response.status.value}")
     }
     return JSON.decodeFromString<SearchResponse>(response.bodyAsText()).response.docs
+  }
+
+  /**
+   * Resolves [term] (`pluginId` or `group:artifactId` of a plugin marker) to the newest published
+   * Gradle plugin. Prefers Maven Central marker artifacts (`{id}:{id}.gradle.plugin`); falls back
+   * to the Plugin Portal's `maven-metadata.xml` when the term looks like a plugin id.
+   */
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  suspend fun findLatestPlugin(term: String): PluginMatch {
+    val query = ArtifactQuery.parse(term)
+    val fromCentral = pluginDocsFromCentral(query)
+    val best = fromCentral.firstOrNull()
+    if (best != null) {
+      val id = pluginIdFrom(best)
+      return PluginMatch(
+        id = id,
+        version = best.latestVersion,
+        alternatives = fromCentral.map { pluginIdFrom(it) }
+          .distinct()
+          .filterNot { it == id },
+      )
+    }
+    if (query.group == null && '.' in query.name) {
+      fetchPluginPortal(query.name)?.let { return it }
+    }
+    error("No Gradle plugin found for '$term'")
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private suspend fun pluginDocsFromCentral(query: ArtifactQuery): List<SearchDoc> {
+    val markerName = markerArtifactName(query.name)
+    val ranked = rankPlugin(query, search(markerName))
+    if (ranked.isNotEmpty()) return ranked
+    val byName = rankPlugin(query, search(query.name).filter { isPluginMarker(it) })
+    if (byName.isNotEmpty()) return byName
+    if (query.group != null || '.' in query.name) return emptyList()
+    return rankPlugin(query, searchQuery(query.name).filter { isPluginMarker(it) })
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun rankPlugin(query: ArtifactQuery, docs: List<SearchDoc>): List<SearchDoc> {
+    val markers = docs.filter { it.latestVersion.isNotEmpty() && isPluginMarker(it) }
+    val named = markers.filter {
+      it.artifact.equals(markerArtifactName(query.name), ignoreCase = true) ||
+        pluginIdFrom(it).equals(query.name, ignoreCase = true)
+    }
+    val candidates = when {
+      query.group != null -> named.filter { it.group.equals(query.group, ignoreCase = true) }
+      else -> named.ifEmpty { markers }
+    }
+    return candidates.sortedWith(
+      compareByDescending<SearchDoc> { it.timestamp }
+        .thenByDescending { it.versionCount }
+        .thenBy { it.group },
+    )
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private suspend fun fetchPluginPortal(pluginId: String): PluginMatch? {
+    val groupPath = pluginId.replace('.', '/')
+    val artifact = markerArtifactName(pluginId)
+    val url = "$pluginPortalM2Url/$groupPath/$artifact/maven-metadata.xml"
+    val response = client.get(url)
+    if (response.status == HttpStatusCode.NotFound) return null
+    if (!response.status.isSuccess()) {
+      error("Gradle Plugin Portal lookup failed with HTTP ${response.status.value}")
+    }
+    return parseMavenMetadata(response.bodyAsText(), pluginId)
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun parseMavenMetadata(xml: String, pluginId: String): PluginMatch? {
+    val release = RELEASE_TAG.find(xml)?.groupValues?.get(1)?.trim()?.ifEmpty { null }
+    val latest = LATEST_TAG.find(xml)?.groupValues?.get(1)?.trim()?.ifEmpty { null }
+    val version = release ?: latest ?: return null
+    return PluginMatch(id = pluginId, version = version)
   }
 
   override fun close() = client.close()
@@ -142,13 +222,29 @@ internal class MavenCentralClient(
      */
     const val CENTRAL_SEARCH_URL = "https://central.sonatype.com/solrsearch/select"
     const val CENTRAL_REPO_URL = "https://repo1.maven.org/maven2"
+    const val PLUGIN_PORTAL_M2_URL = "https://plugins.gradle.org/m2"
 
     private const val SEARCH_ROWS = 20
     private const val CONNECT_TIMEOUT_MILLIS = 30_000L
     private const val REQUEST_TIMEOUT_MILLIS = 60_000L
     private const val MAX_RETRIES = 3
+    private const val PLUGIN_MARKER_SUFFIX = ".gradle.plugin"
 
     private val JSON = Json { ignoreUnknownKeys = true }
+    private val RELEASE_TAG = Regex("""<release>\s*([^<]+)\s*</release>""")
+    private val LATEST_TAG = Regex("""<latest>\s*([^<]+)\s*</latest>""")
+
+    @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+    private fun isPluginMarker(doc: SearchDoc): Boolean =
+      doc.artifact.endsWith(PLUGIN_MARKER_SUFFIX)
+
+    @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+    private fun markerArtifactName(pluginId: String): String =
+      if (pluginId.endsWith(PLUGIN_MARKER_SUFFIX)) pluginId else "$pluginId$PLUGIN_MARKER_SUFFIX"
+
+    @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+    private fun pluginIdFrom(doc: SearchDoc): String =
+      if (doc.artifact.endsWith(PLUGIN_MARKER_SUFFIX)) doc.group else doc.artifact
 
     /** Retries only what is worth retrying: throttling, server faults, and transport errors. */
     @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")

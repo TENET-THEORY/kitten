@@ -231,7 +231,132 @@ class VersionCatalogEditorTest {
     assertEquals(false, Regex("""^clikt\s*=""", RegexOption.MULTILINE).containsMatchIn(result.content))
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `adds a plugin to existing sections`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+
+      [libraries]
+      kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+    val match = PluginMatch(id = "com.ncorti.ktfmt.gradle", version = "0.26.0")
+
+    val result = editor.upsertPlugin(catalog, "ktfmt-gradle", match)
+
+    assertEquals(VersionCatalogEditor.Change.ADDED, result.change)
+    assertEquals(true, """ktfmt-gradle = "0.26.0"""" in result.content)
+    assertEquals(
+      true,
+      """ktfmt-gradle = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt-gradle" }""" in result.content,
+    )
+    assertEquals(true, """kotlin = "2.4.10"""" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `re-upserting the same plugin changes nothing`() {
+    val catalog = editor.upsertPlugin(EMPTY_CATALOG, "kotlin-jvm", KOTLIN_JVM).content
+    val result = editor.upsertPlugin(catalog, "kotlin-jvm", KOTLIN_JVM)
+
+    assertEquals(VersionCatalogEditor.Change.UNCHANGED, result.change)
+    assertEquals(catalog, result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `bumping a plugin version reuses an existing version ref`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent() + "\n"
+
+    val result = editor.upsertPlugin(catalog, "kotlin-jvm", KOTLIN_JVM.copy(version = "2.5.0"))
+
+    assertEquals(VersionCatalogEditor.Change.UPDATED, result.change)
+    assertEquals(true, """kotlin = "2.5.0"""" in result.content)
+    assertEquals(false, """kotlin-jvm = "2.5.0"""" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates a plugins section when missing`() {
+    val result = editor.upsertPlugin("", "kotlin-jvm", KOTLIN_JVM)
+
+    assertEquals(VersionCatalogEditor.Change.ADDED, result.change)
+    assertEquals(
+      """
+      [versions]
+      kotlin-jvm = "2.4.10"
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-jvm" }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `resolves a plugin by alias or id`() {
+    val catalog = """
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+    """.trimIndent()
+
+    assertEquals("kotlin-jvm", editor.resolvePluginAlias(catalog, "kotlin-jvm"))
+    assertEquals("kotlin-jvm", editor.resolvePluginAlias(catalog, "org.jetbrains.kotlin.jvm"))
+    assertEquals(null, editor.resolvePluginAlias(catalog, "ktfmt-gradle"))
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `choosePluginAlias prefers last two segments unless taken`() {
+    val empty = "[plugins]\n"
+    val taken = """
+      [plugins]
+      kotlin-jvm = { id = "com.example.kotlin.jvm", version.ref = "kotlin-jvm" }
+    """.trimIndent()
+
+    assertEquals("kotlin-jvm", editor.choosePluginAlias(empty, KOTLIN_JVM))
+    assertEquals("org-jetbrains-kotlin-jvm", editor.choosePluginAlias(taken, KOTLIN_JVM))
+    assertEquals("kotlin-jvm", editor.choosePluginAlias(taken, PluginMatch("com.example.kotlin.jvm", "1.0")))
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `removePlugin drops an unused version but keeps shared ones`() {
+    val catalog = """
+      [versions]
+      kotlin = "2.4.10"
+      ktfmt-gradle = "0.26.0"
+
+      [libraries]
+      kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+      [plugins]
+      kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+      ktfmt-gradle = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt-gradle" }
+    """.trimIndent() + "\n"
+
+    val shared = editor.removePlugin(catalog, "kotlin-jvm")
+    assertEquals(VersionCatalogEditor.Change.REMOVED, shared.change)
+    assertEquals(true, """kotlin = "2.4.10"""" in shared.content)
+    assertEquals(false, "kotlin-jvm" in shared.content)
+
+    val owned = editor.removePlugin(catalog, "ktfmt-gradle")
+    assertEquals(false, "ktfmt-gradle" in owned.content)
+  }
+
   private companion object {
     const val EMPTY_CATALOG = "[versions]\n\n[libraries]\n"
+    val KOTLIN_JVM = PluginMatch(id = "org.jetbrains.kotlin.jvm", version = "2.4.10")
   }
 }

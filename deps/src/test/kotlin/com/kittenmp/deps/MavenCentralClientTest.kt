@@ -135,6 +135,69 @@ class MavenCentralClientTest {
     assertEquals(0, engine.requestHistory.size)
   }
 
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `findLatestPlugin uses the marker artifact name`() = runTest {
+    val engine = MockEngine {
+      respond(
+        """{"response":{"docs":[${doc("org.jetbrains.kotlin.jvm", "org.jetbrains.kotlin.jvm.gradle.plugin", "2.4.10", timestamp = 1)}]}}""",
+        HttpStatusCode.OK,
+        headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    val match = MavenCentralClient(client = HttpClient(engine)).use {
+      it.findLatestPlugin("org.jetbrains.kotlin.jvm")
+    }
+    assertEquals("org.jetbrains.kotlin.jvm", match.id)
+    assertEquals("2.4.10", match.version)
+    assertEquals("a:org.jetbrains.kotlin.jvm.gradle.plugin", engine.requestHistory.single().url.parameters["q"])
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `findLatestPlugin falls back to the plugin portal metadata`() = runTest {
+    val engine = MockEngine { request ->
+      if (request.url.encodedPath.endsWith("maven-metadata.xml")) {
+        respond(
+          """<metadata><versioning><latest>0.26.0</latest><release>0.26.0</release></versioning></metadata>""",
+          HttpStatusCode.OK,
+          headersOf(HttpHeaders.ContentType, "application/xml"),
+        )
+      } else {
+        respond(
+          """{"response":{"docs":[]}}""",
+          HttpStatusCode.OK,
+          headersOf(HttpHeaders.ContentType, "application/json"),
+        )
+      }
+    }
+    val match = MavenCentralClient(client = HttpClient(engine)).use {
+      it.findLatestPlugin("com.ncorti.ktfmt.gradle")
+    }
+    assertEquals("com.ncorti.ktfmt.gradle", match.id)
+    assertEquals("0.26.0", match.version)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `findLatestPlugin with no results is an error`() = runTest {
+    val engine = MockEngine { request ->
+      if (request.url.encodedPath.endsWith("maven-metadata.xml")) {
+        respondError(HttpStatusCode.NotFound)
+      } else {
+        respond(
+          """{"response":{"docs":[]}}""",
+          HttpStatusCode.OK,
+          headersOf(HttpHeaders.ContentType, "application/json"),
+        )
+      }
+    }
+    val failure = assertFailsWith<IllegalStateException> {
+      MavenCentralClient(client = HttpClient(engine)).use { it.findLatestPlugin("org.example.missing") }
+    }
+    assertTrue("org.example.missing" in failure.message.orEmpty())
+  }
+
   @ComprehensionDebt(agent = "claude-code", model = "claude-opus-5")
   private fun doc(group: String, artifact: String, latestVersion: String, timestamp: Long): String =
     """{"g":"$group","a":"$artifact","latestVersion":"$latestVersion","timestamp":$timestamp,"versionCount":0}"""
