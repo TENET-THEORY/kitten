@@ -275,4 +275,463 @@ class BuildGradleEditorTest {
 
     assertEquals(true, "alias(ktorLibs.plugins.ktor)" in result.content)
   }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `inserts into an existing source set dependencies block`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "commonMain")
+
+    assertEquals(BuildGradleEditor.Change.ADDED, result.change)
+    assertEquals("commonMain", result.sourceSet)
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.clikt)
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates a missing source set beside existing ones`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(BuildGradleEditor.Change.ADDED, result.change)
+    assertEquals("androidMain", result.sourceSet)
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+          }
+          androidMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `infers commonMain when the module already has source sets`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt")
+
+    assertEquals("commonMain", result.sourceSet)
+    assertEquals(true, "implementation(libs.clikt)" in result.content)
+    assertEquals(true, "commonMain.dependencies" in result.content)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `does not infer a source set for a plain jvm module`() {
+    val script = """
+      kotlin {
+        jvmToolchain(21)
+      }
+
+      dependencies {
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt")
+
+    assertEquals(null, result.sourceSet)
+    assertEquals(
+      """
+      kotlin {
+        jvmToolchain(21)
+      }
+
+      dependencies {
+        implementation(libs.clikt)
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `same library can be added to two source sets`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(BuildGradleEditor.Change.ADDED, result.change)
+    assertEquals(true, "androidMain.dependencies" in result.content)
+    assertEquals(2, Regex("implementation\\(libs\\.clikt\\)").findAll(result.content).count())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `source set insertion is idempotent`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          androidMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(BuildGradleEditor.Change.UNCHANGED, result.change)
+    assertEquals(script, result.content)
+    assertEquals("androidMain", result.sourceSet)
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `inserts into a getting-style source set`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          val commonMain by getting {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+            }
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "commonMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          val commonMain by getting {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+              implementation(libs.clikt)
+            }
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates a getting-style source set to match the file`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          val commonMain by getting {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+            }
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          val commonMain by getting {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+            }
+          }
+          val androidMain by getting {
+            dependencies {
+              implementation(libs.clikt)
+            }
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `inserts into a named source set block`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+            }
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "commonMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          commonMain {
+            dependencies {
+              implementation(libs.kotlinx.coroutines.core)
+              implementation(libs.clikt)
+            }
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `adds a dependencies block to a source set that lacks one`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          val androidMain by getting {
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          val androidMain by getting {
+            dependencies {
+              implementation(libs.clikt)
+            }
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates sourceSets inside an existing kotlin block`() {
+    val script = """
+      kotlin {
+        androidTarget()
+        iosArm64()
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "iosMain")
+
+    assertEquals(
+      """
+      kotlin {
+        androidTarget()
+        iosArm64()
+        sourceSets {
+          iosMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `creates a kotlin sourceSets structure when missing`() {
+    val script = """
+      plugins {
+        alias(libs.plugins.kotlin.multiplatform)
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "commonMain")
+
+    assertEquals(
+      """
+      plugins {
+        alias(libs.plugins.kotlin.multiplatform)
+      }
+
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `inserts into a qualified sourceSets accessor`() {
+    val script = """
+      kotlin {
+        sourceSets.commonMain.dependencies {
+          implementation(libs.kotlinx.coroutines.core)
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "commonMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets.commonMain.dependencies {
+          implementation(libs.kotlinx.coroutines.core)
+          implementation(libs.clikt)
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `adds a qualified source set beside an existing one`() {
+    val script = """
+      kotlin {
+        sourceSets.commonMain.dependencies {
+          implementation(libs.kotlinx.coroutines.core)
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "iosMain")
+
+    assertEquals(
+      """
+      kotlin {
+        sourceSets.commonMain.dependencies {
+          implementation(libs.kotlinx.coroutines.core)
+        }
+        sourceSets.iosMain.dependencies {
+          implementation(libs.clikt)
+        }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `preserves four-space indent when adding a source set`() {
+    val script = """
+      kotlin {
+          androidTarget()
+
+          sourceSets {
+              commonMain.dependencies {
+                  implementation(libs.kotlinx.coroutines.core)
+              }
+          }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(script, "clikt", sourceSet = "androidMain")
+
+    assertEquals(
+      """
+      kotlin {
+          androidTarget()
+
+          sourceSets {
+              commonMain.dependencies {
+                  implementation(libs.kotlinx.coroutines.core)
+              }
+              androidMain.dependencies {
+                  implementation(libs.clikt)
+              }
+          }
+      }
+      """.trimIndent() + "\n",
+      result.content,
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `uses a custom catalog inside a source set`() {
+    val script = """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+          }
+        }
+      }
+    """.trimIndent() + "\n"
+
+    val result = editor.addImplementation(
+      script,
+      "server-core",
+      catalogExtension = "ktorLibs",
+      sourceSet = "commonMain",
+    )
+
+    assertEquals(true, "implementation(ktorLibs.server.core)" in result.content)
+  }
 }

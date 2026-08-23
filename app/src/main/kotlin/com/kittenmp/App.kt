@@ -27,11 +27,15 @@ class Install : CliktCommand() {
   val artifactId by argument()
   val module by option("--module")
   val plugin by option("--plugin", help = "Treat the argument as a Gradle plugin id").flag()
+  val sourceSet by option(
+    "--source-set",
+    help = "KMP source set to add the library to (e.g. commonMain, androidMain)",
+  )
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.install(artifactId, module, plugin) })
+      echo(DependencyInstaller().use { it.install(artifactId, module, plugin, sourceSet) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to install dependency")
     }
@@ -48,11 +52,15 @@ class Add : CliktCommand() {
   val module by argument()
   val artifactId by argument()
   val plugin by option("--plugin", help = "Wire a Gradle plugin instead of a library").flag()
+  val sourceSet by option(
+    "--source-set",
+    help = "KMP source set to add the library to (e.g. commonMain, androidMain)",
+  )
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   override fun run() {
     try {
-      echo(DependencyInstaller().use { it.addToModule(module, artifactId, plugin) })
+      echo(DependencyInstaller().use { it.addToModule(module, artifactId, plugin, sourceSet) })
     } catch (e: Exception) {
       throw CliktError(e.message ?: "Failed to add dependency to module")
     }

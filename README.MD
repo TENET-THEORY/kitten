@@ -45,12 +45,14 @@ Looks up the latest release on Maven Central and writes it into the nearest `gra
 kitten install clikt
 kitten install com.github.ajalt.clikt:clikt
 kitten install clikt --module app
+kitten install clikt --module shared --source-set androidMain
 kitten install org.jetbrains.kotlin.jvm --plugin
 kitten install org.jetbrains.kotlin.jvm --plugin --module app
 ```
 
 - Prefer `group:artifactId` when several groups publish the same name; otherwise Kitten picks the newest and lists alternatives.
 - With `--module`, also adds `implementation(libs…)` to that module’s `build.gradle(.kts)`, or `alias(libs.plugins…)` when `--plugin` is set.
+- On a Kotlin Multiplatform module, `--source-set` chooses the source set (`commonMain`, `androidMain`, `iosMain`, …). If the module already has `kotlin { sourceSets { } }` and you omit `--source-set`, the library goes in `commonMain`.
 - Kotlin Gradle plugins (`org.jetbrains.kotlin.*`) share `[versions].kotlin` when it already exists, and use `kotlin-*` aliases (`org.jetbrains.kotlin.plugin.compose` → `kotlin-compose`). Other plugins use the last two segments of the id.
 - Compose UI libraries (`androidx.compose.ui` / `org.jetbrains.compose.ui`) share `[versions].compose-ui` instead of a version key per artifact.
 
@@ -61,11 +63,14 @@ Does not fetch from Maven Central. Resolves the library from the local `libs.ver
 ```bash
 kitten add app clikt
 kitten add :ktor server-core
+kitten add shared clikt --source-set androidMain
 kitten add app kotlin-jvm --plugin
 kitten add lib org.jetbrains.kotlin.jvm --plugin
 ```
 
 When a plugin is applied in more than one module, Kitten also declares it on the root `build.gradle.kts` with `apply false` (creating that file if needed).
+
+`--source-set` is for libraries only. It matches existing KMP DSL styles (`commonMain.dependencies { }`, `val commonMain by getting { }`, or `commonMain { }`) and creates the source set if it is missing.
 
 ### `uninstall` — remove a library or plugin from the catalog
 
@@ -102,7 +107,7 @@ Inspired by Phoenix generators: one command writes the boring layers, consistent
 
 ## Notes
 
-Dependency commands require a `gradle/libs.versions.toml` somewhere above the working directory. Module paths can be `app` or `:app` (nested modules use `:` → `/`, e.g. `:feature:auth` → `feature/auth`).
+Dependency commands require a `gradle/libs.versions.toml` somewhere above the working directory. Module paths can be `app` or `:app` (nested modules use `:` → `/`, e.g. `:feature:auth` → `feature/auth`). Pass `--source-set` on `install` / `add` to target a Kotlin Multiplatform source set.
 
 ### Ktor version catalog
 

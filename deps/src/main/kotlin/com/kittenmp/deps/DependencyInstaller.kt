@@ -29,10 +29,19 @@ class DependencyInstaller internal constructor(
    * Adds or updates [term] (`artifactId` or `group:artifactId`) and returns a one-line summary of
    * what changed. When [module] is set, also wires the library into that module's build script.
    * With [plugin], [term] is treated as a Gradle plugin id instead of a library.
+   * [sourceSet] targets a Kotlin Multiplatform source set (e.g. `androidMain`).
    */
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  fun install(term: String, module: String? = null, plugin: Boolean = false): String {
-    if (plugin) return installPlugin(term, module)
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun install(
+    term: String,
+    module: String? = null,
+    plugin: Boolean = false,
+    sourceSet: String? = null,
+  ): String {
+    if (plugin) {
+      rejectSourceSetForPlugin(sourceSet)
+      return installPlugin(term, module)
+    }
     val catalogFile = findCatalog(startDir)
       ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
     val match = runBlocking { mavenCentralClient.findLatest(term) }
@@ -44,7 +53,7 @@ class DependencyInstaller internal constructor(
     }
     val summary = summarize(result.change, alias, match)
     if (module == null) return summary
-    val wired = addToModule(module, term, catalogFile)
+    val wired = addToModule(module, term, catalogFile, sourceSet)
     return "$summary\n$wired"
   }
 
@@ -71,13 +80,23 @@ class DependencyInstaller internal constructor(
    * Adds `implementation(libs…)` or `implementation(ktorLibs…)` for [term] to [module]'s build
    * script. Local `libs.versions.toml` wins; otherwise the project's published `ktorLibs` catalog
    * is used when present. With [plugin], wires `alias(…plugins…)` instead.
+   * [sourceSet] targets a Kotlin Multiplatform source set (e.g. `androidMain`).
    */
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  fun addToModule(module: String, term: String, plugin: Boolean = false): String {
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun addToModule(
+    module: String,
+    term: String,
+    plugin: Boolean = false,
+    sourceSet: String? = null,
+  ): String {
     val catalogFile = findCatalog(startDir)
       ?: error("Could not find gradle/libs.versions.toml (searched from ${startDir.path})")
-    return if (plugin) addPluginToModule(module, term, catalogFile)
-    else addToModule(module, term, catalogFile)
+    return if (plugin) {
+      rejectSourceSetForPlugin(sourceSet)
+      addPluginToModule(module, term, catalogFile)
+    } else {
+      addToModule(module, term, catalogFile, sourceSet)
+    }
   }
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
@@ -193,25 +212,53 @@ class DependencyInstaller internal constructor(
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   private data class ResolvedPlugin(val alias: String, val extension: String)
 
-  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
-  private fun addToModule(module: String, term: String, catalogFile: File): String {
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun addToModule(
+    module: String,
+    term: String,
+    catalogFile: File,
+    sourceSet: String? = null,
+  ): String {
+    if (sourceSet != null) validateSourceSet(sourceSet)
     val projectRoot = catalogFile.parentFile.parentFile
     val resolved = resolveLibrary(term, catalogFile, projectRoot)
       ?: error(missingLibraryMessage(term, catalogFile, projectRoot))
     val buildFile = findModuleBuildFile(projectRoot, module)
       ?: error("Could not find build.gradle(.kts) for module '$module' under ${projectRoot.path}")
     val original = buildFile.readText()
-    val result = buildGradleEditor.addImplementation(original, resolved.alias, resolved.extension)
+    val result = buildGradleEditor.addImplementation(
+      original,
+      resolved.alias,
+      resolved.extension,
+      sourceSet,
+    )
     if (result.content != original) {
       buildFile.writeText(result.content)
     }
     val accessor = buildGradleEditor.aliasToAccessor(resolved.alias)
     val reference = "${resolved.extension}.$accessor"
+    val location = modulePath(module, buildFile) + sourceSetSuffix(result.sourceSet)
     return when (result.change) {
-      BuildGradleEditor.Change.ADDED -> "added implementation($reference) to ${modulePath(module, buildFile)}"
-      BuildGradleEditor.Change.UNCHANGED -> "unchanged implementation($reference) in ${modulePath(module, buildFile)}"
+      BuildGradleEditor.Change.ADDED -> "added implementation($reference) to $location"
+      BuildGradleEditor.Change.UNCHANGED -> "unchanged implementation($reference) in $location"
     }
   }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun validateSourceSet(name: String) {
+    require(SOURCE_SET_NAME.matches(name)) {
+      "Invalid source set name '$name' (expected an identifier like commonMain or androidMain)"
+    }
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun rejectSourceSetForPlugin(sourceSet: String?) {
+    if (sourceSet != null) error("source-set cannot be used when adding a plugin")
+  }
+
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  private fun sourceSetSuffix(sourceSet: String?): String =
+    if (sourceSet == null) "" else " ($sourceSet)"
 
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.5")
   private fun resolveLibrary(
@@ -316,5 +363,6 @@ class DependencyInstaller internal constructor(
   private companion object {
     val SKIP_WALK_DIRS = setOf("build", ".gradle", "gradle", "src", ".git", "out")
     val BUILD_FILE_NAMES = setOf("build.gradle.kts", "build.gradle")
+    val SOURCE_SET_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
   }
 }

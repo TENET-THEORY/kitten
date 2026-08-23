@@ -200,12 +200,13 @@ private fun FlowContent.commands() {
       name = "install",
       summary = "Add a Maven Central library or Gradle plugin to the catalog",
       detail =
-        "Looks up the latest release and writes it into the nearest libs.versions.toml. Prefer group:artifactId when several groups publish the same name. With --module, also adds implementation(libs…) to that module’s build script. Pass --plugin for a Gradle plugin id (writes alias(libs.plugins…) when --module is set).",
+        "Looks up the latest release and writes it into the nearest libs.versions.toml. Prefer group:artifactId when several groups publish the same name. With --module, also adds implementation(libs…) to that module’s build script. Pass --source-set to target a Kotlin Multiplatform source set (defaults to commonMain when the module already has sourceSets). Pass --plugin for a Gradle plugin id (writes alias(libs.plugins…) when --module is set).",
       examples =
         listOf(
           "kitten install clikt",
           "kitten install com.github.ajalt.clikt:clikt",
           "kitten install clikt --module app",
+          "kitten install clikt --module shared --source-set androidMain",
           "kitten install org.jetbrains.kotlin.jvm --plugin --module app",
         ),
     )
@@ -213,11 +214,12 @@ private fun FlowContent.commands() {
       name = "add",
       summary = "Wire an existing catalog library or plugin into a module",
       detail =
-        "Does not fetch from Maven Central. Resolves from the local libs.versions.toml, or from the project’s published ktorLibs catalog when present. Pass --plugin to wire alias(…plugins…). If that plugin is then used in more than one module, it is also declared on the root build script with apply false.",
+        "Does not fetch from Maven Central. Resolves from the local libs.versions.toml, or from the project’s published ktorLibs catalog when present. Pass --source-set to add a library to a Kotlin Multiplatform source set (commonMain, androidMain, iosMain, …). Pass --plugin to wire alias(…plugins…). If that plugin is then used in more than one module, it is also declared on the root build script with apply false.",
       examples =
         listOf(
           "kitten add app clikt",
           "kitten add :ktor server-core",
+          "kitten add shared clikt --source-set androidMain",
           "kitten add lib kotlin-jvm --plugin",
         ),
     )
@@ -325,6 +327,8 @@ private fun FlowContent.notes() {
       +" → "
       span(classes = "inline-code") { +"feature/auth" }
       +"). Pass "
+      span(classes = "inline-code") { +"--source-set" }
+      +" on install / add to target a Kotlin Multiplatform source set. Pass "
       span(classes = "inline-code") { +"--plugin" }
       +" on install / add / uninstall to work with Gradle plugins instead of libraries. When a plugin is applied in more than one module, Kitten declares it on the root "
       span(classes = "inline-code") { +"build.gradle.kts" }

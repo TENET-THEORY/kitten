@@ -391,6 +391,127 @@ class DependencyInstallerTest {
 
   @Test
   @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `addToModule writes into the requested kmp source set`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        clikt = "5.1.0"
+
+        [libraries]
+        clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+      """.trimIndent() + "\n",
+      moduleBuild = """
+        kotlin {
+          sourceSets {
+            commonMain.dependencies {
+            }
+          }
+        }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root).use { it.addToModule("app", "clikt", sourceSet = "androidMain") }
+
+    assertEquals("added implementation(libs.clikt) to app/build.gradle.kts (androidMain)", summary)
+    assertEquals(
+      """
+      kotlin {
+        sourceSets {
+          commonMain.dependencies {
+          }
+          androidMain.dependencies {
+            implementation(libs.clikt)
+          }
+        }
+      }
+      """.trimIndent() + "\n",
+      File(root, "app/build.gradle.kts").readText(),
+    )
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `addToModule defaults a kmp module to commonMain`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        clikt = "5.1.0"
+
+        [libraries]
+        clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+      """.trimIndent() + "\n",
+      moduleBuild = """
+        kotlin {
+          sourceSets {
+            commonMain.dependencies {
+            }
+          }
+        }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root).use { it.addToModule("app", "clikt") }
+
+    assertEquals("added implementation(libs.clikt) to app/build.gradle.kts (commonMain)", summary)
+    assertTrue("commonMain.dependencies" in File(root, "app/build.gradle.kts").readText())
+    assertTrue("implementation(libs.clikt)" in File(root, "app/build.gradle.kts").readText())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `install with module and source set updates catalog and source set`() {
+    val root = tempProject(
+      catalog = "[versions]\n\n[libraries]\n",
+      moduleBuild = """
+        kotlin {
+          sourceSets {
+            commonMain.dependencies {
+            }
+          }
+        }
+      """.trimIndent() + "\n",
+    )
+
+    val summary = installerFor(root).use {
+      it.install("clikt", module = "app", sourceSet = "iosMain")
+    }
+
+    assertTrue(summary.startsWith("added clikt 5.1.0"), summary)
+    assertTrue("added implementation(libs.clikt) to app/build.gradle.kts (iosMain)" in summary, summary)
+    assertTrue("iosMain.dependencies" in File(root, "app/build.gradle.kts").readText())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `source set cannot be used with a plugin`() {
+    val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
+    val failure = assertFailsWith<IllegalStateException> {
+      installerFor(root).use { it.addToModule("app", "kotlin-jvm", plugin = true, sourceSet = "commonMain") }
+    }
+    assertTrue("source-set" in failure.message.orEmpty())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
+  fun `invalid source set names are rejected`() {
+    val root = tempProject(
+      catalog = """
+        [versions]
+        clikt = "5.1.0"
+
+        [libraries]
+        clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+      """.trimIndent() + "\n",
+      moduleBuild = "dependencies {\n}\n",
+    )
+    val failure = assertFailsWith<IllegalArgumentException> {
+      installerFor(root).use { it.addToModule("app", "clikt", sourceSet = "android-main") }
+    }
+    assertTrue("android-main" in failure.message.orEmpty())
+  }
+
+  @Test
+  @ComprehensionDebt(agent = "cursor", model = "Cursor Grok 4.6")
   fun `uninstall of a missing plugin is an error`() {
     val root = tempProject(catalog = "[versions]\n\n[libraries]\n")
     val failure = assertFailsWith<IllegalStateException> {
